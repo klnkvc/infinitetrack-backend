@@ -4,7 +4,7 @@ const bcrypt = require("bcrypt");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const { verifyToken, checkRole } = require("./middleware/authMiddleWare.js");
-
+const { infinite_track_connection: db } = require("./dbconfig.js"); // Import koneksi ke database
 require("dotenv").config();
 
 const app = express();
@@ -21,113 +21,150 @@ let users = [];
 app.post("/register", async (req, res) => {
   const { name, email, password, role } = req.body;
 
-  // Cek apakah semua data diperlukan ada
+  // Validasi input
   if (!name || !email || !password || !role) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  // Cek apakah pengguna sudah terdaftar
-  const existingUser = users.find((u) => u.email === email);
-  if (existingUser) {
-    return res.status(400).json({ message: "User already exists" });
-  }
+  // Cek apakah pengguna sudah ada
+  db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
+    if (err) {
+      console.error("Error checking user:", err.message);
+      return res.status(500).json({ message: "DB Error" });
+    }
 
-  try {
-    // Enkripsi password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    if (results.length > 0) {
+      return res.status(400).json({ message: "User already exists" });
+    }
 
-    // Buat pengguna baru
-    const newUser = {
-      id: users.length + 1,
-      name,
-      email,
-      password: hashedPassword,
-      role, // Role could be 'intern', 'karyawan', or 'manajemen'
-    };
-    users.push(newUser);
+    // Hash password dan simpan ke database
+    bcrypt.genSalt(10, (err, salt) => {
+      if (err) throw err;
+      bcrypt.hash(password, salt, (err, hashedPassword) => {
+        if (err) throw err;
 
-    // Buat token setelah pendaftaran sukses
-    const token = jwt.sign(
-      { id: newUser.id, role: newUser.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+        const query =
+          "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)";
 
-    // Kirim respon dengan user baru dan token
-    res.status(201).json({ user: newUser, token });
-  } catch (error) {
-    // Tangani kesalahan hashing
-    console.error(error);
-    res.status(500).json({ message: "Internal Server Error" });
-  }
+        // Hanya mengirim data yang diperlukan
+        db.query(query, [name, email, hashedPassword, role], (err, result) => {
+          if (err) {
+            console.error("Error inserting user:", err.message);
+            return res.status(500).json({ message: "Failed to register user" });
+          }
+
+          console.log("User inserted with ID:", result.insertId);
+
+          // Buat token
+          const token = jwt.sign(
+            { id: result.insertId, role: role },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+          );
+
+          res.status(201).json({
+            user: {
+              id: result.insertId,
+              name,
+              email,
+              role,
+            },
+            token,
+          });
+        });
+      });
+    });
+  });
 });
 
 // Login user
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
-  const user = users.find((u) => u.email === email);
-  if (!user)
-    return res.status(400).json({ message: "Email or password is wrong" });
 
-  const validPassword = await bcrypt.compare(password, user.password);
-  if (!validPassword)
-    return res.status(400).json({ message: "Invalid password" });
+  const queryFindUser = "SELECT * FROM users WHERE email = ?";
+  db.query(queryFindUser, [email], async (err, result) => {
+    if (err)
+      return res.status(500).json({ message: "Database error", error: err });
+    if (result.length === 0) {
+      return res.status(400).json({ message: "Email or password is wrong" });
+    }
 
-  // Buat token setelah validasi sukses
-  const token = jwt.sign(
-    { id: user.id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
-  );
-  res.json({ token });
+    const user = result[0];
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+
+    // Buat token setelah validasi sukses
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.json({ token });
+  });
 });
 
 // Get all users
 app.get("/users", (req, res) => {
-  res.json(users);
+  const queryGetAllUsers = "SELECT * FROM users";
+  db.query(queryGetAllUsers, (err, result) => {
+    if (err)
+      return res.status(500).json({ message: "Database error", error: err });
+    res.json(result);
+  });
 });
 
 // Get user by ID
 app.get("/users/:id", (req, res) => {
   const id = parseInt(req.params.id);
-  const user = users.find((u) => u.id === id);
-  if (user) {
-    res.json(user);
-  } else {
-    res.status(404).send("User not found");
-  }
-});
 
-// Create new user
-app.post("/users", (req, res) => {
-  const newUser = { id: users.length + 1, ...req.body };
-  users.push(newUser);
-  res.status(201).json(newUser);
+  const queryGetUserById = "SELECT * FROM users WHERE id = ?";
+  db.query(queryGetUserById, [id], (err, result) => {
+    if (err)
+      return res.status(500).json({ message: "Database error", error: err });
+    if (result.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json(result[0]);
+  });
 });
 
 // Update user
 app.put("/users/:id", (req, res) => {
   const id = parseInt(req.params.id);
-  const index = users.findIndex((u) => u.id === id);
-  if (index !== -1) {
-    users[index] = { id, ...req.body };
-    res.json(users[index]);
-  } else {
-    res.status(404).send("User not found");
-  }
+  const { name, email, password, role } = req.body;
+
+  const queryUpdateUser =
+    "UPDATE users SET name = ?, email = ?, password = ?, role = ? , updated_at = NOW() WHERE id = ?";
+  db.query(
+    queryUpdateUser,
+    [name, email, password, role, id],
+    (err, result) => {
+      if (err)
+        return res.status(500).json({ message: "Database error", error: err });
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json({ message: "User updated successfully" });
+    }
+  );
 });
 
 // Delete user
 app.delete("/users/:id", (req, res) => {
   const id = parseInt(req.params.id);
-  const index = users.findIndex((u) => u.id === id);
-  if (index !== -1) {
-    const deletedUser = users.splice(index, 1);
-    res.json(deletedUser);
-  } else {
-    res.status(404).send("User not found");
-  }
+
+  const queryDeleteUser = "DELETE FROM users WHERE id = ?";
+  db.query(queryDeleteUser, [id], (err, result) => {
+    if (err)
+      return res.status(500).json({ message: "Database error", error: err });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ message: "User deleted successfully" });
+  });
 });
 
 // Intern access only
