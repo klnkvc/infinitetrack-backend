@@ -7,11 +7,11 @@ const nodemailer = require("nodemailer");
 const randomstring = require("randomstring");
 const cookieParser = require("cookie-parser");
 const { verifyToken, checkRole } = require("./middleware/authMiddleWare.js");
-const { infinite_track_connection: db } = require("./dbconfig.js"); // Import koneksi ke database
+const { infinite_track_connection: db } = require("./dbconfig.js");
 require("dotenv").config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
 // Middleware
 app.use(cors());
@@ -25,10 +25,9 @@ function generateOTP() {
   return randomstring.generate({ length: 4, charset: "numeric" });
 }
 
-// Fungsi untuk mengirim OTP
 function sendOTP(email, otp) {
   const mailOptions = {
-    from: process.env.EMAIL, // Email Anda
+    from: process.env.MAIL_USER,
     to: email,
     subject: "OTP Verification",
     html: `<!DOCTYPE html>
@@ -36,11 +35,11 @@ function sendOTP(email, otp) {
             <head>
                 <style>
                     .email-container {
-                        width: 600px; /* Set the desired width */
-                        margin: 0 auto; /* Center the container horizontally */
-                        border-radius: 10px; /* Rounded corners */
-                        overflow: hidden; /* Ensure the rounded corners are applied */
-                        border: 1px solid #ccc; /* Add border for consistency */
+                        width: 600px;
+                        margin: 0 auto;
+                        border-radius: 10px;
+                        overflow: hidden;
+                        border: 1px solid #ccc;
                     }
                     .header {
                         background-color: #7C3AED;
@@ -71,10 +70,10 @@ function sendOTP(email, otp) {
                     background-color: #7C3AED;
                     padding: 15px 20px;
                     color: #FFFFFF;
-                    text-align: right; /* Right align footer content */
+                    text-align: right;
                     }
                     .footer img {
-                        vertical-align: middle; /* Align image vertically in line with text */
+                        vertical-align: middle;
                         margin-right: 10px;
                     }
                 </style>
@@ -82,7 +81,7 @@ function sendOTP(email, otp) {
             <body>
                 <div class="email-container">
                     <div class="header">
-                        <img src="cid:image" alt="illogo" width="100px">
+                        <img src="cid:image" alt="Infinite Track Logo" width="100px">
                     </div>
                     <div class="container">
                         <p>Hello</p>
@@ -90,11 +89,11 @@ function sendOTP(email, otp) {
                         <div class="otp-container">
                             <span class="otp">${otp}</span>
                         </div>
-                        <p>Please use this OTP to log in. Make sure to verify it promptly.</p>
-                        <p>Regards,<br>Infinite Learning</p>
+                        <p>Please use this OTP to reset your password. Make sure to verify it promptly.</p>
+                        <p>Regards,<br>Infinite Track by Infinite Learning</p>
                     </div>
                     <div class="footer">
-                        <img src="cid:image" alt="illogo" width="50px"> Infinite Learning
+                        <img src="cid:image" alt="Infinite Track Logo" width="50px">
                     </div>
                 </div>
             </body>
@@ -104,8 +103,8 @@ function sendOTP(email, otp) {
   let transporter = nodemailer.createTransport({
     service: "Gmail",
     auth: {
-      user: process.env.MAIL_USER, // Email Anda
-      pass: process.env.MAIL_PASS, // Password Email Anda
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
     },
     tls: {
       rejectUnauthorized: false,
@@ -124,11 +123,11 @@ function sendOTP(email, otp) {
 // Endpoint untuk mengirim OTP
 app.post("/send-otp", async (req, res) => {
   const { email } = req.body;
-  const otp = generateOTP(); // Menghasilkan OTP
-  otpCache[email] = otp; // Menyimpan OTP dalam cache
+  const otp = generateOTP();
+  otpCache[email] = otp;
 
   try {
-    await sendOTP(email, otp); // Mengirim OTP
+    await sendOTP(email, otp);
     console.log("OTP sent");
     res.status(200).json({ message: "OTP sent" });
   } catch (error) {
@@ -137,29 +136,37 @@ app.post("/send-otp", async (req, res) => {
   }
 });
 
-// Verify OTP
-app.post("/verify-otp", (req, res) => {
-  const { email, otp } = req.body;
+//Reset Password
+app.post("/reset-password", (req, res) => {
+  const { email, newPassword, otp } = req.body;
 
-  // Check if email exists in the cache
-  if (!otpCache.hasOwnProperty(email)) {
-    return res.status(400).json({ message: "Email not found" });
+  // Cek apakah email dan otp sesuai
+  if (!otpCache.hasOwnProperty(email) || otpCache[email] !== otp.trim()) {
+    return res.status(400).json({ message: "Invalid OTP" });
   }
 
-  // Check if OTP matches the one stored in the cache
-  if (otpCache[email] === otp.trim()) {
-    // Remove OTP from cache after successful verification
-    delete otpCache[email];
-    return (
-      res.status(200).json({ message: "OTP verified" }) &&
-      console.log("OTP verified")
-    );
-  } else {
-    return (
-      res.status(400).json({ message: "Invalid OTP" }) &&
-      console.log("Invalid OTP")
-    );
-  }
+  // Hapus OTP setelah verifikasi
+  delete otpCache[email];
+
+  // Hash password baru
+  bcrypt.genSalt(10, (err, salt) => {
+    if (err) throw err;
+    bcrypt.hash(newPassword, salt, (err, hashedPassword) => {
+      if (err) throw err;
+
+      // Update password di database
+      const queryUpdatePassword =
+        "UPDATE users SET password = ? WHERE email = ?";
+      db.query(queryUpdatePassword, [hashedPassword, email], (err, result) => {
+        if (err) {
+          console.error("Error updating password:", err.message);
+          return res.status(500).json({ message: "Failed to reset password" });
+        }
+
+        res.status(200).json({ message: "Password successfully reset" });
+      });
+    });
+  });
 });
 
 // Register
@@ -313,7 +320,7 @@ app.delete("/users/:id", (req, res) => {
 });
 
 // Intern access only
-app.get("/intern", verifyToken, checkRole(["intern"]), (req, res) => {
+app.get("/intern", verifyToken, checkRole(["Internship"]), (req, res) => {
   res.send("Hello Intern!");
 });
 
@@ -321,14 +328,14 @@ app.get("/intern", verifyToken, checkRole(["intern"]), (req, res) => {
 app.get(
   "/karyawan",
   verifyToken,
-  checkRole(["karyawan", "manajemen"]),
+  checkRole(["Karyawan", "Manajemen"]),
   (req, res) => {
     res.send("Hello Karyawan or Manajemen!");
   }
 );
 
 // Manajemen access only
-app.get("/manajemen", verifyToken, checkRole(["manajemen"]), (req, res) => {
+app.get("/manajemen", verifyToken, checkRole(["Manajemen"]), (req, res) => {
   res.send("Hello Manajemen!");
 });
 
