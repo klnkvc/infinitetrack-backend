@@ -3,19 +3,164 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+const randomstring = require("randomstring");
+const cookieParser = require("cookie-parser");
 const { verifyToken, checkRole } = require("./middleware/authMiddleWare.js");
 const { infinite_track_connection: db } = require("./dbconfig.js"); // Import koneksi ke database
 require("dotenv").config();
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(cookieParser());
 
-// Array simulasi data user
-let users = [];
+// OTP Controller
+const otpCache = {};
+
+function generateOTP() {
+  return randomstring.generate({ length: 4, charset: "numeric" });
+}
+
+// Fungsi untuk mengirim OTP
+function sendOTP(email, otp) {
+  const mailOptions = {
+    from: process.env.EMAIL, // Email Anda
+    to: email,
+    subject: "OTP Verification",
+    html: `<!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    .email-container {
+                        width: 600px; /* Set the desired width */
+                        margin: 0 auto; /* Center the container horizontally */
+                        border-radius: 10px; /* Rounded corners */
+                        overflow: hidden; /* Ensure the rounded corners are applied */
+                        border: 1px solid #ccc; /* Add border for consistency */
+                    }
+                    .header {
+                        background-color: #7C3AED;
+                        color: #fff;
+                        padding: 10px 20px;
+                    }
+                    .container {
+                        font-family: Arial, sans-serif;
+                        padding: 18px 20px 18px;
+                        color: #000000;
+                        background-color: #f9f9f9;
+                    }
+                    .otp-container {
+                        text-align: center;
+                        padding: 18px;
+                    }
+                    .otp {
+                        font-size: 18px;
+                        font-weight: bold;
+                        color: #FFFFFF;
+                        border: 1px solid #ccc;
+                        padding: 10px;
+                        border-radius: 5px;
+                        background-color: #7C3AED;
+                        display: inline-block;
+                    }
+                    .footer {
+                    background-color: #7C3AED;
+                    padding: 15px 20px;
+                    color: #FFFFFF;
+                    text-align: right; /* Right align footer content */
+                    }
+                    .footer img {
+                        vertical-align: middle; /* Align image vertically in line with text */
+                        margin-right: 10px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="email-container">
+                    <div class="header">
+                        <img src="cid:image" alt="illogo" width="100px">
+                    </div>
+                    <div class="container">
+                        <p>Hello</p>
+                        <p>Your OTP code is:</p>
+                        <div class="otp-container">
+                            <span class="otp">${otp}</span>
+                        </div>
+                        <p>Please use this OTP to log in. Make sure to verify it promptly.</p>
+                        <p>Regards,<br>Infinite Learning</p>
+                    </div>
+                    <div class="footer">
+                        <img src="cid:image" alt="illogo" width="50px"> Infinite Learning
+                    </div>
+                </div>
+            </body>
+            </html>`,
+  };
+
+  let transporter = nodemailer.createTransport({
+    service: "Gmail",
+    auth: {
+      user: process.env.MAIL_USER, // Email Anda
+      pass: process.env.MAIL_PASS, // Password Email Anda
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+  });
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log("Error occurred:", error);
+    } else {
+      console.log("OTP Email sent successfully:", info.response);
+    }
+  });
+}
+
+// Endpoint untuk mengirim OTP
+app.post("/send-otp", async (req, res) => {
+  const { email } = req.body;
+  const otp = generateOTP(); // Menghasilkan OTP
+  otpCache[email] = otp; // Menyimpan OTP dalam cache
+
+  try {
+    await sendOTP(email, otp); // Mengirim OTP
+    console.log("OTP sent");
+    res.status(200).json({ message: "OTP sent" });
+  } catch (error) {
+    console.error("Error sending OTP:", error);
+    res.status(500).json({ message: "Failed to send OTP" });
+  }
+});
+
+// Verify OTP
+app.post("/verify-otp", (req, res) => {
+  const { email, otp } = req.body;
+
+  // Check if email exists in the cache
+  if (!otpCache.hasOwnProperty(email)) {
+    return res.status(400).json({ message: "Email not found" });
+  }
+
+  // Check if OTP matches the one stored in the cache
+  if (otpCache[email] === otp.trim()) {
+    // Remove OTP from cache after successful verification
+    delete otpCache[email];
+    return (
+      res.status(200).json({ message: "OTP verified" }) &&
+      console.log("OTP verified")
+    );
+  } else {
+    return (
+      res.status(400).json({ message: "Invalid OTP" }) &&
+      console.log("Invalid OTP")
+    );
+  }
+});
 
 // Register
 app.post("/register", async (req, res) => {
