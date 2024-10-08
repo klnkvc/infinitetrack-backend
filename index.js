@@ -21,6 +21,8 @@ app.use(cookieParser());
 // OTP Controller
 const otpCache = {};
 
+let otpVerifiedCache = {};
+
 function generateOTP() {
   return randomstring.generate({ length: 4, charset: "numeric" });
 }
@@ -41,17 +43,39 @@ app.post("/send-otp", async (req, res) => {
   }
 });
 
-//Reset Password
-app.post("/reset-password", (req, res) => {
-  const { email, newPassword, otp } = req.body;
+app.post("/verify-otp", (req, res) => {
+  const { email, otp } = req.body;
 
-  // Cek apakah email dan otp sesuai
+  // Cek apakah email dan OTP sesuai
   if (!otpCache.hasOwnProperty(email) || otpCache[email] !== otp.trim()) {
     return res.status(400).json({ message: "Invalid OTP" });
   }
 
-  // Hapus OTP setelah verifikasi
+  // Hapus OTP setelah verifikasi sukses
   delete otpCache[email];
+
+  // Simpan status verifikasi OTP
+  otpVerifiedCache[email] = true;
+
+  res
+    .status(200)
+    .json({ message: "OTP verified, you can now reset your password" });
+});
+
+app.post("/reset-password", (req, res) => {
+  const { email, newPassword } = req.body;
+
+  // Cek apakah email disertakan
+  if (!email || !newPassword) {
+    return res
+      .status(400)
+      .json({ message: "Email and new password are required" });
+  }
+
+  // Cek apakah OTP sudah diverifikasi
+  if (!otpVerifiedCache.hasOwnProperty(email)) {
+    return res.status(400).json({ message: "OTP not verified for this email" });
+  }
 
   // Hash password baru
   bcrypt.genSalt(10, (err, salt) => {
@@ -67,6 +91,9 @@ app.post("/reset-password", (req, res) => {
           console.error("Error updating password:", err.message);
           return res.status(500).json({ message: "Failed to reset password" });
         }
+
+        // Hapus status verifikasi OTP setelah password berhasil direset
+        delete otpVerifiedCache[email];
 
         res.status(200).json({ message: "Password successfully reset" });
       });
