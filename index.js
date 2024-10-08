@@ -30,17 +30,31 @@ function generateOTP() {
 // Endpoint untuk mengirim OTP
 app.post("/send-otp", async (req, res) => {
   const { email } = req.body;
-  const otp = generateOTP();
-  otpCache[email] = otp;
 
-  try {
-    await sendOTP(email, otp);
-    console.log("OTP sent");
-    res.status(200).json({ message: "OTP sent" });
-  } catch (error) {
-    console.error("Error sending OTP:", error);
-    res.status(500).json({ message: "Failed to send OTP" });
-  }
+  // Cek apakah email ada di database
+  db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
+    if (err) {
+      console.error("Error checking user:", err.message);
+      return res.status(500).json({ message: "DB Error" });
+    }
+
+    if (results.length === 0) {
+      return res.status(400).json({ message: "User not registered" });
+    }
+
+    const otp = generateOTP();
+    otpCache[email] = otp;
+
+    sendOTP(email, otp)
+      .then(() => {
+        console.log("OTP sent");
+        res.status(200).json({ message: "OTP sent" });
+      })
+      .catch((error) => {
+        console.error("Error sending OTP:", error);
+        res.status(500).json({ message: "Failed to send OTP" });
+      });
+  });
 });
 
 app.post("/verify-otp", (req, res) => {
@@ -72,30 +86,50 @@ app.post("/reset-password", (req, res) => {
       .json({ message: "Email and new password are required" });
   }
 
-  // Cek apakah OTP sudah diverifikasi
-  if (!otpVerifiedCache.hasOwnProperty(email)) {
-    return res.status(400).json({ message: "OTP not verified for this email" });
-  }
+  // Cek apakah email ada di database
+  db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
+    if (err) {
+      console.error("Error checking user:", err.message);
+      return res.status(500).json({ message: "DB Error" });
+    }
 
-  // Hash password baru
-  bcrypt.genSalt(10, (err, salt) => {
-    if (err) throw err;
-    bcrypt.hash(newPassword, salt, (err, hashedPassword) => {
+    if (results.length === 0) {
+      return res.status(400).json({ message: "User not registered" });
+    }
+
+    // Cek apakah OTP sudah diverifikasi
+    if (!otpVerifiedCache.hasOwnProperty(email)) {
+      return res
+        .status(400)
+        .json({ message: "OTP not verified for this email" });
+    }
+
+    // Hash password baru
+    bcrypt.genSalt(10, (err, salt) => {
       if (err) throw err;
+      bcrypt.hash(newPassword, salt, (err, hashedPassword) => {
+        if (err) throw err;
 
-      // Update password di database
-      const queryUpdatePassword =
-        "UPDATE users SET password = ? WHERE email = ?";
-      db.query(queryUpdatePassword, [hashedPassword, email], (err, result) => {
-        if (err) {
-          console.error("Error updating password:", err.message);
-          return res.status(500).json({ message: "Failed to reset password" });
-        }
+        // Update password di database
+        const queryUpdatePassword =
+          "UPDATE users SET password = ? WHERE email = ?";
+        db.query(
+          queryUpdatePassword,
+          [hashedPassword, email],
+          (err, result) => {
+            if (err) {
+              console.error("Error updating password:", err.message);
+              return res
+                .status(500)
+                .json({ message: "Failed to reset password" });
+            }
 
-        // Hapus status verifikasi OTP setelah password berhasil direset
-        delete otpVerifiedCache[email];
+            // Hapus status verifikasi OTP setelah password berhasil direset
+            delete otpVerifiedCache[email];
 
-        res.status(200).json({ message: "Password successfully reset" });
+            res.status(200).json({ message: "Password successfully reset" });
+          }
+        );
       });
     });
   });
