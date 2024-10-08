@@ -3,9 +3,6 @@ require("dotenv").config();
 const path = require("path");
 
 function sendOTP(email, otp) {
-  // Correct path to the image file
-  const imagePath = path.join(__dirname, "..", "assets", "image.png"); // Navigate one level up to access the assets folder
-
   const mailOptions = {
     from: process.env.MAIL_USER,
     to: email,
@@ -61,10 +58,10 @@ function sendOTP(email, otp) {
             <body>
                 <div class="email-container">
                     <div class="header">
-                        <img src="cid:headerImage" alt="Infinite Track Logo" width="100px">
+                        <img src="" alt="Infinite Track Logo" width="100px">
                     </div>
                     <div class="container">
-                        <img src="cid:image" alt="Decorative Image" style="width: 100%; max-width: 600px;">
+                        <img src="https://www.dropbox.com/scl/fi/nhzo32dtupi2v8kcqgpo4/img_otp.png?rlkey=laje4h7p3js23zn5vb035ejid&st=cnoog2az&raw=1" alt="Decorative Image" style="width: 100%; max-width: 600px;">
                         <p>Hello</p>
                         <p>Your OTP code is:</p>
                         <div class="otp-container">
@@ -74,28 +71,11 @@ function sendOTP(email, otp) {
                         <p>Regards,<br>Infinite Track by Infinite Learning</p>
                     </div>
                     <div class="footer">
-                        <img src="cid:footerImage" alt="Infinite Track Logo" width="50px">
+                        <img src="" alt="Infinite Track Logo" width="50px">
                     </div>
                 </div>
             </body>
             </html>`,
-    attachments: [
-      {
-        filename: "image.png", // Change this if your image file has a different extension
-        path: imagePath, // Full path to the image
-        cid: "image", // Same cid value as in the html img src
-      },
-      {
-        filename: "image.png", // Optional: replace with your header logo image if applicable
-        path: path.join(__dirname, "..", "assets", "image.png"),
-        cid: "headerImage", // Change to desired cid for header image
-      },
-      {
-        filename: "image.png", // Optional: replace with your footer logo image if applicable
-        path: path.join(__dirname, "..", "assets", "image.png"),
-        cid: "footerImage", // Change to desired cid for footer image
-      },
-    ],
   };
 
   let transporter = nodemailer.createTransport({
