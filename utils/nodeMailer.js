@@ -45,7 +45,7 @@ async function sendOTP(email, otp) {
                         background-color: #fff;
                         color: #fff;
                         padding: 10px 20px;
-                        border-bottom: 3px solid #7C3AED; 
+                        border-bottom: 3px solid #DBDBDB; 
                     }
                     .container {
                         font-family: Arial, sans-serif;
@@ -95,7 +95,7 @@ async function sendOTP(email, otp) {
                     </div>
                     <div class="container">
                         <img src="https://www.dropbox.com/scl/fi/nhzo32dtupi2v8kcqgpo4/img_otp.png?rlkey=laje4h7p3js23zn5vb035ejid&st=cnoog2az&raw=1" 
-                            alt="Decorative Image" style="display: block; margin: 0 auto; width: 100%; max-width: 300px;">
+                            alt="Decorative Image" style="display: block; margin: 0 auto; width: 100%; max-width: 200px;">
                         <p class="large-text">Hello, ${user.name}</p>
                         <p class="center-text">Your OTP code is:</p>
                         <div class="otp-container">
