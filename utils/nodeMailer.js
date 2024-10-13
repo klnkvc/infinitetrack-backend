@@ -4,7 +4,6 @@ const mysql = require("mysql2/promise");
 
 async function sendOTP(email, otp) {
   try {
-    // Buat koneksi ke database
     const connection = await mysql.createConnection({
       host: process.env.HOST,
       user: process.env.UNAME,
@@ -13,7 +12,6 @@ async function sendOTP(email, otp) {
       port: process.env.DBPORT,
     });
 
-    // Ambil nama user berdasarkan email
     const [rows] = await connection.execute(
       "SELECT name FROM users WHERE email = ?",
       [email]
@@ -25,7 +23,6 @@ async function sendOTP(email, otp) {
 
     const user = rows[0];
 
-    // Opsi email
     const mailOptions = {
       from: process.env.MAIL_USER,
       to: email,
@@ -43,9 +40,7 @@ async function sendOTP(email, otp) {
                     }
                     .header {
                         background-color: #fff;
-                        color: #fff;
-                        padding: 10px 20px;
-                        border-bottom: 3px solid #DBDBDB; 
+                        color: #fff; 
                     }
                     .container {
                         font-family: Arial, sans-serif;
@@ -63,8 +58,10 @@ async function sendOTP(email, otp) {
                         color: #FFFFFF;
                         border: 1px solid #ccc;
                         padding: 10px;
+                        padding-right: 30px;
+                        padding-left: 30px;
                         border-radius: 5px;
-                        background-color: #7C3AED;
+                        background-color: #8169AE;
                         display: inline-block;
                     }
                     .center-text {
@@ -76,33 +73,36 @@ async function sendOTP(email, otp) {
                         font-weight: bold; 
                     }
                     .footer {
-                        background-color: #7C3AED;
+                        background-color: #f9f9f9;
                         padding: 15px 20px;
-                        color: #FFFFFF;
+                        color: #f9f9f9;
                         text-align: right;
                     }
                     .footer img {
                         vertical-align: middle;
                         margin-right: 10px;
                     }
+                    .padding-bottom {
+                        padding-bottom: 30px; 
+                    }
                 </style>
             </head>
             <body>
                 <div class="email-container">
                     <div class="header">
-                        <img src="https://www.dropbox.com/scl/fi/n0zajm6lhrjp83e7nnwe5/logo.png?rlkey=xsg0meo8lqo2mzu7022jvuipv&st=wm2p4vnf&raw=1"
-                            alt="Infinite Track Logo" style="display: block; margin: 0 auto; width: 100%; max-width: 100px; padding-top: 20px; padding-bottom: 20px;">
+                        <img src="https://www.dropbox.com/scl/fi/b5p8cn0qif9868hctokp5/banner_otp_verification.png?rlkey=z4sgwd9oasds65l8o416um0vj&st=ks1fpemq&raw=1"
+                            alt="Infinite Track Logo" style="display: block; margin: 0 auto; width: 100%; height: auto;">
                     </div>
                     <div class="container">
-                        <img src="https://www.dropbox.com/scl/fi/nhzo32dtupi2v8kcqgpo4/img_otp.png?rlkey=laje4h7p3js23zn5vb035ejid&st=cnoog2az&raw=1" 
+                        <img src="https://www.dropbox.com/scl/fi/zjsazg52n3iohyiko4rp7/logo_revisi.png?rlkey=27tr5qxfry02lnkx5ti2tkyjt&st=vu95vgju&raw=1" 
                             alt="Decorative Image" style="display: block; margin: 0 auto; width: 100%; max-width: 200px;">
                         <p class="large-text">Hello, ${user.name}</p>
-                        <p class="center-text">Your OTP code is:</p>
+                        <p class="center-text">Great to see you aboard! Let's quickly<br>verify your email to get you started.<br>Your verification code is:</p>
                         <div class="otp-container">
                             <span class="otp">${otp}</span>
                         </div>
-                        <p>Please use this OTP to reset your password. Make sure to verify it promptly.</p>
-                        <p>Regards,<br>Infinite Track by Infinite Learning</p>
+                        <p>Please use this OTP to reset your password. Never share your code<br>with anyone.</p>
+                        <p class="padding-bottom">Cheers,<br>Infinite Track by Infinite Learning.</p>
                     </div>
                     <div class="footer">
                     </div>
@@ -111,7 +111,6 @@ async function sendOTP(email, otp) {
             </html>`,
     };
 
-    // Membuat transporter email
     let transporter = nodemailer.createTransport({
       service: "Gmail",
       auth: {
@@ -123,7 +122,6 @@ async function sendOTP(email, otp) {
       },
     });
 
-    // Mengirim email
     return new Promise((resolve, reject) => {
       transporter.sendMail(mailOptions, (error, info) => {
         if (error) {
