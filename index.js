@@ -137,10 +137,10 @@ app.post("/reset-password", (req, res) => {
 
 // Register
 app.post("/register", async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, division } = req.body;
 
   // Validasi input
-  if (!name || !email || !password || !role) {
+  if (!name || !email || !password || !role || !division) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -155,43 +155,117 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Hash password dan simpan ke database
-    bcrypt.genSalt(10, (err, salt) => {
-      if (err) throw err;
-      bcrypt.hash(password, salt, (err, hashedPassword) => {
-        if (err) throw err;
+    // Cek dan tambahkan role jika belum ada
+    db.query(
+      "SELECT * FROM roles WHERE role = ?",
+      [role],
+      (err, roleResults) => {
+        if (err) {
+          console.error("Error checking role:", err.message);
+          return res.status(500).json({ message: "DB Error" });
+        }
 
-        const query =
-          "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)";
+        let roleId;
 
-        // Hanya mengirim data yang diperlukan
-        db.query(query, [name, email, hashedPassword, role], (err, result) => {
-          if (err) {
-            console.error("Error inserting user:", err.message);
-            return res.status(500).json({ message: "Failed to register user" });
-          }
+        if (roleResults.length > 0) {
+          // Role sudah ada, ambil roleId
+          roleId = roleResults[0].id;
+        } else {
+          // Role belum ada, tambahkan ke tabel roles
+          db.query(
+            "INSERT INTO roles (role) VALUES (?)",
+            [role],
+            (err, result) => {
+              if (err) {
+                console.error("Error inserting role:", err.message);
+                return res.status(500).json({ message: "Failed to add role" });
+              }
 
-          console.log("User inserted with ID:", result.insertId);
-
-          // Buat token
-          const token = jwt.sign(
-            { id: result.insertId, role: role },
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
+              roleId = result.insertId; // Ambil roleId dari role yang baru ditambahkan
+            }
           );
+        }
 
-          res.status(201).json({
-            user: {
-              id: result.insertId,
-              name,
-              email,
-              role,
-            },
-            token,
-          });
-        });
-      });
-    });
+        // Cek dan tambahkan division jika belum ada
+        db.query(
+          "SELECT * FROM divisions WHERE division = ?",
+          [division],
+          (err, divisionResults) => {
+            if (err) {
+              console.error("Error checking division:", err.message);
+              return res.status(500).json({ message: "DB Error" });
+            }
+
+            let divisionId;
+
+            if (divisionResults.length > 0) {
+              // Division sudah ada, ambil divisionId
+              divisionId = divisionResults[0].id;
+            } else {
+              // Division belum ada, tambahkan ke tabel divisions
+              db.query(
+                "INSERT INTO divisions (division) VALUES (?)",
+                [division],
+                (err, result) => {
+                  if (err) {
+                    console.error("Error inserting division:", err.message);
+                    return res
+                      .status(500)
+                      .json({ message: "Failed to add division" });
+                  }
+
+                  divisionId = result.insertId; // Ambil divisionId dari division yang baru ditambahkan
+                }
+              );
+            }
+
+            // Hash password dan simpan ke database setelah mendapatkan roleId dan divisionId
+            bcrypt.genSalt(10, (err, salt) => {
+              if (err) throw err;
+              bcrypt.hash(password, salt, (err, hashedPassword) => {
+                if (err) throw err;
+
+                const query =
+                  "INSERT INTO users (name, email, password, roleId, divisionId) VALUES (?, ?, ?, ?, ?)";
+
+                db.query(
+                  query,
+                  [name, email, hashedPassword, roleId, divisionId],
+                  (err, result) => {
+                    if (err) {
+                      console.error("Error inserting user:", err.message);
+                      return res
+                        .status(500)
+                        .json({ message: "Failed to register user" });
+                    }
+
+                    console.log("User inserted with ID:", result.insertId);
+
+                    // Buat token
+                    const token = jwt.sign(
+                      { id: result.insertId, role: role },
+                      process.env.JWT_SECRET,
+                      { expiresIn: "1h" }
+                    );
+
+                    res.status(201).json({
+                      user: {
+                        id: result.insertId,
+                        name,
+                        email,
+                        role,
+                        division,
+                      },
+                      token,
+                    });
+                  }
+                );
+              });
+            });
+          }
+        );
+      }
+    );
   });
 });
 
@@ -201,8 +275,10 @@ app.post("/login", async (req, res) => {
 
   const queryFindUser = "SELECT * FROM users WHERE email = ?";
   db.query(queryFindUser, [email], async (err, result) => {
-    if (err)
+    if (err) {
       return res.status(500).json({ message: "Database error", error: err });
+    }
+
     if (result.length === 0) {
       return res.status(400).json({ message: "Email or password is wrong" });
     }
@@ -213,14 +289,32 @@ app.post("/login", async (req, res) => {
       return res.status(400).json({ message: "Invalid password" });
     }
 
-    // Buat token setelah validasi sukses
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    // Ambil role berdasarkan roleId dari pengguna
+    const queryFindRole = "SELECT * FROM roles WHERE roleId = ?";
+    db.query(queryFindRole, [user.roleId], (err, roleResult) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err });
+      }
 
-    res.json({ token });
+      if (roleResult.length === 0) {
+        return res.status(400).json({ message: "Role not found" });
+      }
+
+      const userRole = roleResult[0].role; // Ambil nama role
+
+      // Buat token setelah validasi sukses
+      const token = jwt.sign(
+        { id: user.userId, role: user.roleId },
+        process.env.JWT_SECRET,
+        { expiresIn: "1h" }
+      );
+
+      const userId = user.userId;
+      const userName = user.name;
+
+      // Kirim respons dengan token, userId, userName, dan userRole
+      res.json({ token, userId, userName, userRole });
+    });
   });
 });
 
@@ -292,16 +386,16 @@ app.get("/intern", verifyToken, checkRole(["Internship"]), (req, res) => {
 
 // Karyawan access only
 app.get(
-  "/karyawan",
+  "/employee",
   verifyToken,
-  checkRole(["Karyawan", "Manajemen"]),
+  checkRole(["Employee", "Management"]),
   (req, res) => {
-    res.send("Hello Karyawan or Manajemen!");
+    res.send("Hello Employee or Management!");
   }
 );
 
 // Manajemen access only
-app.get("/manajemen", verifyToken, checkRole(["Manajemen"]), (req, res) => {
+app.get("/management", verifyToken, checkRole(["Management"]), (req, res) => {
   res.send("Hello Manajemen!");
 });
 
