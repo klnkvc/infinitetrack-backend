@@ -427,24 +427,70 @@ app.get("/users/:id", (req, res) => {
 });
 
 // Update user
-app.put("/users/:id", (req, res) => {
-  const id = parseInt(req.params.id);
+app.put("/users/:id", async (req, res) => {
+  const userId = parseInt(req.params.id);
   const { name, email, password, role } = req.body;
 
-  const queryUpdateUser =
-    "UPDATE users SET name = ?, email = ?, password = ?, role = ? , updated_at = NOW() WHERE id = ?";
-  db.query(
-    queryUpdateUser,
-    [name, email, password, role, id],
-    (err, result) => {
-      if (err)
-        return res.status(500).json({ message: "Database error", error: err });
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.json({ message: "User updated successfully" });
+  // Ambil roleId berdasarkan nama role
+  const queryFindRoleId = "SELECT roleId FROM roles WHERE role = ?";
+
+  db.query(queryFindRoleId, [role], (err, roleResult) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err });
     }
-  );
+
+    if (roleResult.length === 0) {
+      return res.status(400).json({ message: "Role not found" });
+    }
+
+    const roleId = roleResult[0].roleId; // Ambil roleId dari hasil query
+
+    // Jika password disediakan, hash password
+    let hashedPassword = password;
+
+    if (password) {
+      bcrypt.genSalt(10, (err, salt) => {
+        if (err) {
+          return res
+            .status(500)
+            .json({ message: "Error generating salt", error: err });
+        }
+
+        bcrypt.hash(password, salt, (err, hash) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Error hashing password", error: err });
+          }
+          hashedPassword = hash; // Ganti dengan hashed password
+          updateUser();
+        });
+      });
+    } else {
+      // Jika password tidak diupdate, panggil updateUser tanpa password baru
+      updateUser();
+    }
+
+    function updateUser() {
+      const queryUpdateUser =
+        "UPDATE users SET name = ?, email = ?, password = ?, roleId = ? , updated_at = NOW() WHERE userId = ?";
+      db.query(
+        queryUpdateUser,
+        [name, email, hashedPassword, roleId, userId],
+        (err, result) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Database error", error: err });
+          }
+          if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "User not found" });
+          }
+          res.json({ message: "User updated successfully" });
+        }
+      );
+    }
+  });
 });
 
 // Delete user
