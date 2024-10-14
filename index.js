@@ -147,8 +147,8 @@ app.post("/register", async (req, res) => {
     !password ||
     !role ||
     !division ||
-    !annual_balance ||
-    !annual_used
+    annual_balance === undefined ||
+    annual_used === undefined
   ) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -248,23 +248,47 @@ app.post("/register", async (req, res) => {
                         .json({ message: "Failed to register user" });
                     }
 
-                    // Buat token
-                    const token = jwt.sign(
-                      { id: result.insertId, role: role },
-                      process.env.JWT_SECRET,
-                      { expiresIn: "1h" }
-                    );
+                    // Ambil userId dari result
+                    const userId = result.insertId;
 
-                    res.status(201).json({
-                      user: {
-                        id: result.insertId,
-                        name,
-                        email,
-                        role,
-                        division,
-                      },
-                      token,
-                    });
+                    // Sisipkan annual_balance dan annual_used ke tabel leave_balance
+                    const leaveBalanceQuery =
+                      "INSERT INTO leave_balance (userId, annual_balance, annual_used) VALUES (?, ?, ?)";
+                    db.query(
+                      leaveBalanceQuery,
+                      [userId, annual_balance, annual_used],
+                      (err) => {
+                        if (err) {
+                          console.error(
+                            "Error inserting leave balance:",
+                            err.message
+                          );
+                          return res.status(500).json({
+                            message: "Failed to initialize leave balance",
+                          });
+                        }
+
+                        // Buat token
+                        const token = jwt.sign(
+                          { id: userId, role: role },
+                          process.env.JWT_SECRET,
+                          { expiresIn: "1h" }
+                        );
+
+                        res.status(201).json({
+                          user: {
+                            id: userId,
+                            name,
+                            email,
+                            role,
+                            division,
+                            annual_balance,
+                            annual_used,
+                          },
+                          token,
+                        });
+                      }
+                    );
                   }
                 );
               });
