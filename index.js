@@ -302,18 +302,30 @@ app.post("/login", async (req, res) => {
 
       const userRole = roleResult[0].role; // Ambil nama role
 
-      // Buat token setelah validasi sukses
-      const token = jwt.sign(
-        { id: user.userId, role: user.roleId },
-        process.env.JWT_SECRET,
-        { expiresIn: "1h" }
-      );
+      // Ambil division berdasarkan divisionId dari pengguna
+      const queryFindDivision = "SELECT * FROM divisions WHERE divisionId = ?";
+      db.query(queryFindDivision, [user.divisionId], (err, divisionResult) => {
+        if (err) {
+          return res
+            .status(500)
+            .json({ message: "Database error", error: err });
+        }
 
-      const userId = user.userId;
-      const userName = user.name;
+        const division = divisionResult[0].division; // Ambil nama role
 
-      // Kirim respons dengan token, userId, userName, dan userRole
-      res.json({ token, userId, userName, userRole });
+        // Buat token setelah validasi sukses
+        const token = jwt.sign(
+          { id: user.userId, role: user.roleId },
+          process.env.JWT_SECRET,
+          { expiresIn: "1h" }
+        );
+
+        const userId = user.userId;
+        const userName = user.name;
+
+        // Kirim respons dengan token, userId, userName, userRole, dan division
+        res.json({ token, userId, userName, userRole, division });
+      });
     });
   });
 });
