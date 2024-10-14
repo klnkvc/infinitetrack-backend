@@ -5,8 +5,6 @@ const { infinite_track_connection: db } = require("../dbconfig.js");
 
 const verifyToken = (req, res, next) => {
   const token = req.header("Authorization")?.split(" ")[1]; // Ambil token dari header
-  console.log("JWT Secret:", process.env.JWT_SECRET);
-  console.log("Received Token:", token);
   if (!token) {
     return res
       .status(401)
@@ -15,7 +13,6 @@ const verifyToken = (req, res, next) => {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("Verified Token Payload:", verified);
     req.user = verified; // Menyimpan data user dari token (termasuk roleId)
 
     const queryFindRole = "SELECT * FROM roles WHERE roleId = ?";
@@ -28,10 +25,9 @@ const verifyToken = (req, res, next) => {
         return res.status(400).json({ message: "Role not found" });
       }
 
-      // Simpan role ke dalam req.user
       req.user.roleName = result[0].role; // Ambil nama role dan simpan sebagai roleName
 
-      next(); // Lanjut ke middleware berikutnya
+      next();
     });
   } catch (error) {
     console.error("Token verification error:", error);

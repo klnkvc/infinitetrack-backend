@@ -137,10 +137,19 @@ app.post("/reset-password", (req, res) => {
 
 // Register
 app.post("/register", async (req, res) => {
-  const { name, email, password, role, division } = req.body;
+  const { name, email, password, role, division, annual_balance, annual_used } =
+    req.body;
 
   // Validasi input
-  if (!name || !email || !password || !role || !division) {
+  if (
+    !name ||
+    !email ||
+    !password ||
+    !role ||
+    !division ||
+    !annual_balance ||
+    !annual_used
+  ) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -169,7 +178,7 @@ app.post("/register", async (req, res) => {
 
         if (roleResults.length > 0) {
           // Role sudah ada, ambil roleId
-          roleId = roleResults[0].id;
+          roleId = roleResults[0].roleId;
         } else {
           // Role belum ada, tambahkan ke tabel roles
           db.query(
@@ -200,7 +209,7 @@ app.post("/register", async (req, res) => {
 
             if (divisionResults.length > 0) {
               // Division sudah ada, ambil divisionId
-              divisionId = divisionResults[0].id;
+              divisionId = divisionResults[0].divisionId;
             } else {
               // Division belum ada, tambahkan ke tabel divisions
               db.query(
@@ -238,8 +247,6 @@ app.post("/register", async (req, res) => {
                         .status(500)
                         .json({ message: "Failed to register user" });
                     }
-
-                    console.log("User inserted with ID:", result.insertId);
 
                     // Buat token
                     const token = jwt.sign(
@@ -322,9 +329,21 @@ app.post("/login", async (req, res) => {
 
         const userId = user.userId;
         const userName = user.name;
+        const currentHour = new Date().getHours();
+        let greeting;
+
+        if (currentHour >= 5 && currentHour < 12) {
+          greeting = "Good Morning";
+        } else if (currentHour >= 12 && currentHour < 17) {
+          greeting = "Good Afternoon";
+        } else if (currentHour >= 17 && currentHour < 21) {
+          greeting = "Good Evening";
+        } else {
+          greeting = "Good Night";
+        }
 
         // Kirim respons dengan token, userId, userName, userRole, dan division
-        res.json({ token, userId, userName, userRole, division });
+        res.json({ token, userId, userName, userRole, division, greeting });
       });
     });
   });
