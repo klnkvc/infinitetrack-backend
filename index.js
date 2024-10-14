@@ -342,32 +342,60 @@ app.post("/login", async (req, res) => {
             .json({ message: "Database error", error: err });
         }
 
-        const division = divisionResult[0].division; // Ambil nama role
+        const division = divisionResult[0].division; // Ambil nama division
 
-        // Buat token setelah validasi sukses
-        const token = jwt.sign(
-          { id: user.userId, role: user.roleId },
-          process.env.JWT_SECRET,
-          { expiresIn: "1h" }
-        );
+        // Ambil annual_balance dan annual_used dari leave_balance berdasarkan userId
+        const queryFindLeaveBalance =
+          "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+        db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Database error", error: err });
+          }
 
-        const userId = user.userId;
-        const userName = user.name;
-        const currentHour = new Date().getHours();
-        let greeting;
+          let annualBalance = 0; // Nilai default jika tidak ada data
+          let annualUsed = 0; // Nilai default jika tidak ada data
 
-        if (currentHour >= 5 && currentHour < 12) {
-          greeting = "Good Morning";
-        } else if (currentHour >= 12 && currentHour < 17) {
-          greeting = "Good Afternoon";
-        } else if (currentHour >= 17 && currentHour < 21) {
-          greeting = "Good Evening";
-        } else {
-          greeting = "Good Night";
-        }
+          if (balanceResult.length > 0) {
+            annualBalance = balanceResult[0].annual_balance;
+            annualUsed = balanceResult[0].annual_used;
+          }
 
-        // Kirim respons dengan token, userId, userName, userRole, dan division
-        res.json({ token, userId, userName, userRole, division, greeting });
+          // Buat token setelah validasi sukses
+          const token = jwt.sign(
+            { id: user.userId, role: user.roleId },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+          );
+
+          const userId = user.userId;
+          const userName = user.name;
+          const currentHour = new Date().getHours();
+          let greeting;
+
+          if (currentHour >= 5 && currentHour < 12) {
+            greeting = "Good Morning";
+          } else if (currentHour >= 12 && currentHour < 17) {
+            greeting = "Good Afternoon";
+          } else if (currentHour >= 17 && currentHour < 21) {
+            greeting = "Good Evening";
+          } else {
+            greeting = "Good Night";
+          }
+
+          // Kirim respons dengan token, userId, userName, userRole, division, greeting, annual_balance, dan annual_used
+          res.json({
+            token,
+            userId,
+            userName,
+            userRole,
+            division,
+            greeting,
+            annualBalance,
+            annualUsed,
+          });
+        });
       });
     });
   });
