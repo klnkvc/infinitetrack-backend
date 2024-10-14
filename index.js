@@ -375,13 +375,13 @@ app.post("/login", async (req, res) => {
           let greeting;
 
           if (currentHour >= 5 && currentHour < 12) {
-            greeting = "Good Morning";
+            greeting = "Good Morning 🌞";
           } else if (currentHour >= 12 && currentHour < 17) {
-            greeting = "Good Afternoon";
+            greeting = "Good Afternoon ☀️";
           } else if (currentHour >= 17 && currentHour < 21) {
-            greeting = "Good Evening";
+            greeting = "Good Evening 🌤️";
           } else {
-            greeting = "Good Night";
+            greeting = "Good Night 🌙";
           }
 
           // Kirim respons dengan token, userId, userName, userRole, division, greeting, annual_balance, dan annual_used
