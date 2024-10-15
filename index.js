@@ -542,10 +542,13 @@ app.get("/management", verifyToken, checkRole(["Management"]), (req, res) => {
 app.post("/attendance/checkin", verifyToken, (req, res) => {
   const { attendance_category } = req.body;
   const attendance_category_id = getAttendanceCategoryId(attendance_category);
-  const attendance_status_id = 1; // Default 'Confirm' saat check-in
-  const userId = req.user.id; // Mengambil user ID dari token JWT
+  const userId = req.user.id;
 
-  // Insert ke tabel attendance
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  let attendance_status_id = currentHour < 9 ? 1 : 2;
+
   db.query(
     "INSERT INTO attendance (check_in_time, check_out_time,  userId, attendance_category_id, attendance_status_id, attendance_date) VALUES (NOW(), NULL, ?, ?, ?, CURDATE())",
     [userId, attendance_category_id, attendance_status_id],
@@ -575,7 +578,6 @@ app.post("/attendance/checkin", verifyToken, (req, res) => {
         res.status(200).json({
           attendanceId,
           attendance_status: detailsResult[0].attendance_status,
-          attendance_date: detailsResult[0].attendance_date,
         });
       });
     }
@@ -586,10 +588,13 @@ app.post("/attendance/checkin", verifyToken, (req, res) => {
 app.post("/attendance/checkout", verifyToken, (req, res) => {
   const { attendance_category } = req.body;
   const attendance_category_id = getAttendanceCategoryId(attendance_category);
-  const attendance_status_id = 3;
   const userId = req.user.id;
 
-  // Insert ke tabel attendance
+  const now = new Date();
+  const currentHour = now.getHours();
+
+  let attendance_status_id = currentHour > 17 ? 3 : 1;
+
   db.query(
     "INSERT INTO attendance (check_in_time, check_out_time,  userId, attendance_category_id, attendance_status_id, attendance_date) VALUES (NULL, NOW(), ?, ?, ?, CURDATE())",
     [userId, attendance_category_id, attendance_status_id],
@@ -619,7 +624,6 @@ app.post("/attendance/checkout", verifyToken, (req, res) => {
         res.status(200).json({
           attendanceId,
           attendance_status: detailsResult[0].attendance_status,
-          attendance_date: detailsResult[0].attendance_date,
         });
       });
     }
