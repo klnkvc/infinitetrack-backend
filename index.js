@@ -137,10 +137,19 @@ app.post("/reset-password", (req, res) => {
 
 // Register
 app.post("/register", async (req, res) => {
-  const { name, email, password, role, division } = req.body;
+  const { name, email, password, role, division, annual_balance, annual_used } =
+    req.body;
 
   // Validasi input
-  if (!name || !email || !password || !role || !division) {
+  if (
+    !name ||
+    !email ||
+    !password ||
+    !role ||
+    !division ||
+    annual_balance === undefined ||
+    annual_used === undefined
+  ) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
@@ -169,7 +178,7 @@ app.post("/register", async (req, res) => {
 
         if (roleResults.length > 0) {
           // Role sudah ada, ambil roleId
-          roleId = roleResults[0].id;
+          roleId = roleResults[0].roleId;
         } else {
           // Role belum ada, tambahkan ke tabel roles
           db.query(
@@ -200,7 +209,7 @@ app.post("/register", async (req, res) => {
 
             if (divisionResults.length > 0) {
               // Division sudah ada, ambil divisionId
-              divisionId = divisionResults[0].id;
+              divisionId = divisionResults[0].divisionId;
             } else {
               // Division belum ada, tambahkan ke tabel divisions
               db.query(
@@ -239,25 +248,47 @@ app.post("/register", async (req, res) => {
                         .json({ message: "Failed to register user" });
                     }
 
-                    console.log("User inserted with ID:", result.insertId);
+                    // Ambil userId dari result
+                    const userId = result.insertId;
 
-                    // Buat token
-                    const token = jwt.sign(
-                      { id: result.insertId, role: role },
-                      process.env.JWT_SECRET,
-                      { expiresIn: "1h" }
+                    // Sisipkan annual_balance dan annual_used ke tabel leave_balance
+                    const leaveBalanceQuery =
+                      "INSERT INTO leave_balance (userId, annual_balance, annual_used) VALUES (?, ?, ?)";
+                    db.query(
+                      leaveBalanceQuery,
+                      [userId, annual_balance, annual_used],
+                      (err) => {
+                        if (err) {
+                          console.error(
+                            "Error inserting leave balance:",
+                            err.message
+                          );
+                          return res.status(500).json({
+                            message: "Failed to initialize leave balance",
+                          });
+                        }
+
+                        // Buat token
+                        const token = jwt.sign(
+                          { id: userId, role: role },
+                          process.env.JWT_SECRET,
+                          { expiresIn: "1h" }
+                        );
+
+                        res.status(201).json({
+                          user: {
+                            id: userId,
+                            name,
+                            email,
+                            role,
+                            division,
+                            annual_balance,
+                            annual_used,
+                          },
+                          token,
+                        });
+                      }
                     );
-
-                    res.status(201).json({
-                      user: {
-                        id: result.insertId,
-                        name,
-                        email,
-                        role,
-                        division,
-                      },
-                      token,
-                    });
                   }
                 );
               });
@@ -311,20 +342,60 @@ app.post("/login", async (req, res) => {
             .json({ message: "Database error", error: err });
         }
 
-        const division = divisionResult[0].division; // Ambil nama role
+        const division = divisionResult[0].division; // Ambil nama division
 
-        // Buat token setelah validasi sukses
-        const token = jwt.sign(
-          { id: user.userId, role: user.roleId },
-          process.env.JWT_SECRET,
-          { expiresIn: "1h" }
-        );
+        // Ambil annual_balance dan annual_used dari leave_balance berdasarkan userId
+        const queryFindLeaveBalance =
+          "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+        db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Database error", error: err });
+          }
 
-        const userId = user.userId;
-        const userName = user.name;
+          let annualBalance = 0; // Nilai default jika tidak ada data
+          let annualUsed = 0; // Nilai default jika tidak ada data
 
-        // Kirim respons dengan token, userId, userName, userRole, dan division
-        res.json({ token, userId, userName, userRole, division });
+          if (balanceResult.length > 0) {
+            annualBalance = balanceResult[0].annual_balance;
+            annualUsed = balanceResult[0].annual_used;
+          }
+
+          // Buat token setelah validasi sukses
+          const token = jwt.sign(
+            { id: user.userId, role: user.roleId },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+          );
+
+          const userId = user.userId;
+          const userName = user.name;
+          const currentHour = new Date().getHours();
+          let greeting;
+
+          if (currentHour >= 5 && currentHour < 12) {
+            greeting = "Good Morning 🌞";
+          } else if (currentHour >= 12 && currentHour < 17) {
+            greeting = "Good Afternoon ☀️";
+          } else if (currentHour >= 17 && currentHour < 21) {
+            greeting = "Good Evening 🌤️";
+          } else {
+            greeting = "Good Night 🌙";
+          }
+
+          // Kirim respons dengan token, userId, userName, userRole, division, greeting, annual_balance, dan annual_used
+          res.json({
+            token,
+            userId,
+            userName,
+            userRole,
+            division,
+            greeting,
+            annualBalance,
+            annualUsed,
+          });
+        });
       });
     });
   });
@@ -356,24 +427,70 @@ app.get("/users/:id", (req, res) => {
 });
 
 // Update user
-app.put("/users/:id", (req, res) => {
-  const id = parseInt(req.params.id);
+app.put("/users/:id", async (req, res) => {
+  const userId = parseInt(req.params.id);
   const { name, email, password, role } = req.body;
 
-  const queryUpdateUser =
-    "UPDATE users SET name = ?, email = ?, password = ?, role = ? , updated_at = NOW() WHERE id = ?";
-  db.query(
-    queryUpdateUser,
-    [name, email, password, role, id],
-    (err, result) => {
-      if (err)
-        return res.status(500).json({ message: "Database error", error: err });
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      res.json({ message: "User updated successfully" });
+  // Ambil roleId berdasarkan nama role
+  const queryFindRoleId = "SELECT roleId FROM roles WHERE role = ?";
+
+  db.query(queryFindRoleId, [role], (err, roleResult) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err });
     }
-  );
+
+    if (roleResult.length === 0) {
+      return res.status(400).json({ message: "Role not found" });
+    }
+
+    const roleId = roleResult[0].roleId; // Ambil roleId dari hasil query
+
+    // Jika password disediakan, hash password
+    let hashedPassword = password;
+
+    if (password) {
+      bcrypt.genSalt(10, (err, salt) => {
+        if (err) {
+          return res
+            .status(500)
+            .json({ message: "Error generating salt", error: err });
+        }
+
+        bcrypt.hash(password, salt, (err, hash) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Error hashing password", error: err });
+          }
+          hashedPassword = hash; // Ganti dengan hashed password
+          updateUser();
+        });
+      });
+    } else {
+      // Jika password tidak diupdate, panggil updateUser tanpa password baru
+      updateUser();
+    }
+
+    function updateUser() {
+      const queryUpdateUser =
+        "UPDATE users SET name = ?, email = ?, password = ?, roleId = ? , updated_at = NOW() WHERE userId = ?";
+      db.query(
+        queryUpdateUser,
+        [name, email, hashedPassword, roleId, userId],
+        (err, result) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Database error", error: err });
+          }
+          if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "User not found" });
+          }
+          res.json({ message: "User updated successfully" });
+        }
+      );
+    }
+  });
 });
 
 // Delete user
