@@ -27,6 +27,16 @@ function generateOTP() {
   return randomstring.generate({ length: 4, charset: "numeric" });
 }
 
+// Fungsi untuk mendapatkan ID kategori absensi berdasarkan nama
+const getAttendanceCategoryId = (category) => {
+  return category === "wfh" ? 1 : 2; // 1 untuk WFH, 2 untuk WFO
+};
+
+// Fungsi untuk mendapatkan ID status absensi
+const getAttendanceStatusId = (status) => {
+  return status === "late" ? 1 : 2; // 1 untuk Late, 2 untuk Confirm
+};
+
 // Endpoint untuk mengirim OTP
 app.post("/send-otp", async (req, res) => {
   const { email } = req.body;
@@ -526,6 +536,53 @@ app.get(
 // Manajemen access only
 app.get("/management", verifyToken, checkRole(["Management"]), (req, res) => {
   res.send("Hello Manajemen!");
+});
+
+// Endpoint untuk Check-In
+app.post("/attendance/checkin", verifyToken, (req, res) => {
+  const { attendance_category } = req.body; // attendance_date tidak perlu
+  const attendance_category_id = getAttendanceCategoryId(attendance_category);
+  const attendance_status_id = 2; // Default 'Confirm' saat check-in
+  const userId = req.user.id; // Mengambil user ID dari token JWT
+
+  db.query(
+    "INSERT INTO attendance (check_in_time, userId, attendance_category_id, attendance_status_id, attendance_date) VALUES (NOW(), ?, ?, ?, CURDATE())",
+    [userId, attendance_category_id, attendance_status_id],
+    (err, result) => {
+      if (err) {
+        console.error("Error during check-in:", err.message);
+        return res.status(500).json({ message: "Failed to check in" });
+      }
+      res.status(200).json({
+        message: "Check-in successful",
+        attendance_id: result.insertId,
+      });
+    }
+  );
+});
+
+// Endpoint untuk Check-Out
+app.post("/attendance/checkout/:id", verifyToken, (req, res) => {
+  const { id } = req.params;
+  const check_out_time = new Date();
+  const userId = req.user.id;
+
+  db.query(
+    "UPDATE attendance SET check_out_time = ?, update_at = NOW(), update_by = ? WHERE id = ? AND userId = ?",
+    [check_out_time, id, userId],
+    (err, result) => {
+      if (err) {
+        console.error("Error during check-out:", err.message);
+        return res.status(500).json({ message: "Failed to check out" });
+      }
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          message: "Attendance record not found or already checked out",
+        });
+      }
+      res.status(200).json({ message: "Check-out successful" });
+    }
+  );
 });
 
 // Start server
