@@ -51,9 +51,10 @@ async function sendOTP(email, otp) {
                     .otp-container {
                         text-align: center;
                         padding: 18px;
+                        padding-bottom: 30px;
                     }
                     .otp {
-                        font-size: 18px;
+                        font-size: 30px;
                         font-weight: bold;
                         color: #FFFFFF;
                         border: 1px solid #ccc;
@@ -101,7 +102,7 @@ async function sendOTP(email, otp) {
                         <div class="otp-container">
                             <span class="otp">${otp}</span>
                         </div>
-                        <p>Please use this OTP to reset your password. Never share your code<br>with anyone.</p>
+                        <p>Please use this OTP to reset your password. Never share your code with anyone.</p>
                         <p class="padding-bottom">Cheers,<br>Infinite Track by Infinite Learning.</p>
                     </div>
                     <div class="footer">
