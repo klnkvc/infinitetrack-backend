@@ -1,3 +1,5 @@
+const crypto = require("crypto"); // Untuk menghasilkan token unik
+const moment = require("moment"); // Untuk manipulasi waktu
 const express = require("express");
 const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
@@ -162,6 +164,49 @@ app.post("/reset-password", (req, res) => {
             res.status(200).json({ message: "Password successfully reset" });
           }
         );
+      });
+    });
+  });
+});
+
+// Endpoint untuk membuat link spesial
+app.post("/admin/generate-link", (req, res) => {
+  const { userId } = req.body; // Admin menentukan userId yang ingin diberikan link spesial
+
+  // Cek apakah userId valid
+  const queryFindUser = "SELECT * FROM users WHERE userId = ?";
+  db.query(queryFindUser, [userId], (err, result) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err });
+    }
+
+    if (result.length === 0) {
+      return res.status(400).json({ message: "User not found" });
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString("hex"); // Token unik
+    const expiresAt = moment().add(2, "minutes").format("YYYY-MM-DD HH:mm:ss");
+
+    // Simpan token ke database
+    const queryInsertToken = `
+      INSERT INTO special_login (userId, token, expires_at, used) 
+      VALUES (?, ?, ?, ?)
+    `;
+    db.query(queryInsertToken, [userId, token, expiresAt, 0], (err, result) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ message: "Failed to generate special link", error: err });
+      }
+
+      // Buat link spesial dengan token
+      const specialLink = `http://localhost:${port}/login?token=${token}`;
+
+      res.status(200).json({
+        message: "Special login link generated",
+        link: specialLink,
+        expiresAt,
       });
     });
   });
@@ -334,104 +379,146 @@ app.post("/register", async (req, res) => {
 
 // Login user
 app.post("/login", async (req, res) => {
-  const { email, password } = req.body;
+  // const { email, password, token } = req.body;
+  const token = req.query.token;
 
-  const queryFindUser = "SELECT * FROM users WHERE email = ?";
-  db.query(queryFindUser, [email], async (err, result) => {
-    if (err) {
-      return res.status(500).json({ message: "Database error", error: err });
-    }
-
-    if (result.length === 0) {
-      return res.status(400).json({ message: "Email or password is wrong" });
-    }
-
-    const user = result[0];
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(400).json({ message: "Invalid password" });
-    }
-
-    // Ambil role berdasarkan roleId dari pengguna
-    const queryFindRole = "SELECT * FROM roles WHERE roleId = ?";
-    db.query(queryFindRole, [user.roleId], (err, roleResult) => {
+  if (token) {
+    // Jika user menggunakan link spesial
+    const queryCheckToken = "SELECT * FROM special_login WHERE token = ?";
+    db.query(queryCheckToken, [token], (err, result) => {
       if (err) {
         return res.status(500).json({ message: "Database error", error: err });
       }
 
-      if (roleResult.length === 0) {
-        return res.status(400).json({ message: "Role not found" });
+      if (result.length === 0) {
+        return res.status(400).json({ message: "Invalid or expired token" });
       }
 
-      const userRole = roleResult[0].role; // Ambil nama role
+      const tokenData = result[0];
+      const userId = tokenData.userId;
 
-      // Ambil division berdasarkan divisionId dari pengguna
-      const queryFindDivision = "SELECT * FROM divisions WHERE divisionId = ?";
-      db.query(queryFindDivision, [user.divisionId], (err, divisionResult) => {
+      const expiresAt = moment(tokenData.expires_at); // Ambil waktu kedaluwarsa
+
+      // Cek apakah token sudah kadaluarsa
+      if (moment().isAfter(expiresAt)) {
+        return res.status(400).json({ message: "Token has expired" });
+      }
+
+      // Ambil informasi user berdasarkan userId dari token
+      const queryFindUser = "SELECT * FROM users WHERE userId = ?";
+      db.query(queryFindUser, [userId], (err, userResult) => {
         if (err) {
           return res
             .status(500)
             .json({ message: "Database error", error: err });
         }
 
-        const division = divisionResult[0].division; // Ambil nama division
+        if (userResult.length === 0) {
+          return res.status(400).json({ message: "User not found" });
+        }
 
-        // Ambil annual_balance dan annual_used dari leave_balance berdasarkan userId
-        const queryFindLeaveBalance =
-          "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
-        db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
-          if (err) {
-            return res
-              .status(500)
-              .json({ message: "Database error", error: err });
-          }
+        const user = userResult[0];
+        completeLogin(user, res); // Fungsi untuk melanjutkan proses login
+      });
+    });
+  } else {
+    // Proses login normal menggunakan email dan password
+    const queryFindUser = "SELECT * FROM users WHERE email = ?";
+    db.query(queryFindUser, [email], async (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err });
+      }
 
-          let annualBalance = 0; // Nilai default jika tidak ada data
-          let annualUsed = 0; // Nilai default jika tidak ada data
+      if (result.length === 0) {
+        return res.status(400).json({ message: "Email or password is wrong" });
+      }
 
-          if (balanceResult.length > 0) {
-            annualBalance = balanceResult[0].annual_balance;
-            annualUsed = balanceResult[0].annual_used;
-          }
+      const user = result[0];
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(400).json({ message: "Invalid password" });
+      }
 
-          // Buat token setelah validasi sukses
-          const token = jwt.sign(
-            { id: user.userId, role: user.roleId },
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-          );
+      completeLogin(user, res);
+    });
+  }
+});
 
-          const userId = user.userId;
-          const userName = user.name;
-          const currentHour = new Date().getHours();
-          let greeting;
+// Fungsi untuk melanjutkan proses login setelah validasi berhasil
+const completeLogin = (user, res) => {
+  const queryFindRole = "SELECT * FROM roles WHERE roleId = ?";
+  db.query(queryFindRole, [user.roleId], (err, roleResult) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err });
+    }
 
-          if (currentHour >= 5 && currentHour < 12) {
-            greeting = "Good Morning 🌞";
-          } else if (currentHour >= 12 && currentHour < 17) {
-            greeting = "Good Afternoon ☀️";
-          } else if (currentHour >= 17 && currentHour < 21) {
-            greeting = "Good Evening 🌤️";
-          } else {
-            greeting = "Good Night 🌙";
-          }
+    if (roleResult.length === 0) {
+      return res.status(400).json({ message: "Role not found" });
+    }
 
-          // Kirim respons dengan token, userId, userName, userRole, division, greeting, annual_balance, dan annual_used
-          res.json({
-            token,
-            userId,
-            userName,
-            userRole,
-            division,
-            greeting,
-            annualBalance,
-            annualUsed,
-          });
+    const userRole = roleResult[0].role;
+
+    const queryFindDivision = "SELECT * FROM divisions WHERE divisionId = ?";
+    db.query(queryFindDivision, [user.divisionId], (err, divisionResult) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err });
+      }
+
+      const division = divisionResult[0].division;
+
+      const queryFindLeaveBalance =
+        "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+      db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
+        if (err) {
+          return res
+            .status(500)
+            .json({ message: "Database error", error: err });
+        }
+
+        let annualBalance = 0;
+        let annualUsed = 0;
+
+        if (balanceResult.length > 0) {
+          annualBalance = balanceResult[0].annual_balance;
+          annualUsed = balanceResult[0].annual_used;
+        }
+
+        // Buat token untuk sesi login
+        const authToken = jwt.sign(
+          { id: user.userId, role: user.roleId },
+          process.env.JWT_SECRET,
+          { expiresIn: "1h" }
+        );
+
+        const userId = user.userId;
+        const userName = user.name;
+        const currentHour = new Date().getHours();
+        let greeting;
+
+        if (currentHour >= 5 && currentHour < 12) {
+          greeting = "Good Morning 🌞";
+        } else if (currentHour >= 12 && currentHour < 17) {
+          greeting = "Good Afternoon ☀️";
+        } else if (currentHour >= 17 && currentHour < 21) {
+          greeting = "Good Evening 🌤️";
+        } else {
+          greeting = "Good Night 🌙";
+        }
+
+        res.json({
+          token: authToken,
+          userId,
+          userName,
+          userRole,
+          division,
+          greeting,
+          annualBalance,
+          annualUsed,
         });
       });
     });
   });
-});
+};
 
 // Get all users
 app.get("/users", (req, res) => {
