@@ -214,8 +214,18 @@ app.post("/admin/generate-link", (req, res) => {
 
 // Register
 app.post("/register", async (req, res) => {
-  const { name, email, password, role, division, annual_balance, annual_used } =
-    req.body;
+  const {
+    name,
+    email,
+    password,
+    role,
+    division,
+    annual_balance,
+    annual_used,
+    is_headprogram, // Indikator apakah user adalah headprogram
+    headprogram, // Nama headprogram jika is_headprogram = true
+    is_approver, // Konfirmasi apakah user adalah approver
+  } = req.body;
 
   // Validasi input
   if (
@@ -225,7 +235,8 @@ app.post("/register", async (req, res) => {
     !role ||
     !division ||
     annual_balance === undefined ||
-    annual_used === undefined
+    annual_used === undefined ||
+    (is_headprogram && !headprogram)
   ) {
     return res.status(400).json({ message: "All fields are required" });
   }
@@ -241,7 +252,7 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Cek dan tambahkan role jika belum ada
+    // Proses role dan division (sama seperti sebelumnya)
     db.query(
       "SELECT * FROM roles WHERE role = ?",
       [role],
@@ -252,12 +263,9 @@ app.post("/register", async (req, res) => {
         }
 
         let roleId;
-
         if (roleResults.length > 0) {
-          // Role sudah ada, ambil roleId
           roleId = roleResults[0].roleId;
         } else {
-          // Role belum ada, tambahkan ke tabel roles
           db.query(
             "INSERT INTO roles (role) VALUES (?)",
             [role],
@@ -266,13 +274,12 @@ app.post("/register", async (req, res) => {
                 console.error("Error inserting role:", err.message);
                 return res.status(500).json({ message: "Failed to add role" });
               }
-
-              roleId = result.insertId; // Ambil roleId dari role yang baru ditambahkan
+              roleId = result.insertId;
             }
           );
         }
 
-        // Cek dan tambahkan division jika belum ada
+        // Cek dan tambahkan division
         db.query(
           "SELECT * FROM divisions WHERE division = ?",
           [division],
@@ -283,12 +290,9 @@ app.post("/register", async (req, res) => {
             }
 
             let divisionId;
-
             if (divisionResults.length > 0) {
-              // Division sudah ada, ambil divisionId
               divisionId = divisionResults[0].divisionId;
             } else {
-              // Division belum ada, tambahkan ke tabel divisions
               db.query(
                 "INSERT INTO divisions (division) VALUES (?)",
                 [division],
@@ -299,83 +303,176 @@ app.post("/register", async (req, res) => {
                       .status(500)
                       .json({ message: "Failed to add division" });
                   }
-
-                  divisionId = result.insertId; // Ambil divisionId dari division yang baru ditambahkan
+                  divisionId = result.insertId;
                 }
               );
             }
 
-            // Hash password dan simpan ke database setelah mendapatkan roleId dan divisionId
-            bcrypt.genSalt(10, (err, salt) => {
-              if (err) throw err;
-              bcrypt.hash(password, salt, (err, hashedPassword) => {
-                if (err) throw err;
+            // Cek apakah pengguna adalah headprogram
+            let headprogramId = null;
+            if (is_headprogram) {
+              db.query(
+                "SELECT * FROM head_program WHERE headprogram = ?",
+                [headprogram],
+                async (err, headprogramResults) => {
+                  if (err) {
+                    console.error("Error checking headprogram:", err.message);
+                    return res.status(500).json({ message: "DB Error" });
+                  }
 
-                const query =
-                  "INSERT INTO users (name, email, password, roleId, divisionId) VALUES (?, ?, ?, ?, ?)";
-
-                db.query(
-                  query,
-                  [name, email, hashedPassword, roleId, divisionId],
-                  (err, result) => {
-                    if (err) {
-                      console.error("Error inserting user:", err.message);
+                  let headprogramId;
+                  if (headprogramResults.length > 0) {
+                    headprogramId = headprogramResults[0].headprogramId;
+                  } else {
+                    try {
+                      headprogramId = await insertHeadProgram(headprogram);
+                    } catch (error) {
                       return res
                         .status(500)
-                        .json({ message: "Failed to register user" });
+                        .json({ message: "Failed to add headprogram" });
                     }
-
-                    // Ambil userId dari result
-                    const userId = result.insertId;
-
-                    // Sisipkan annual_balance dan annual_used ke tabel leave_balance
-                    const leaveBalanceQuery =
-                      "INSERT INTO leave_balance (userId, annual_balance, annual_used) VALUES (?, ?, ?)";
-                    db.query(
-                      leaveBalanceQuery,
-                      [userId, annual_balance, annual_used],
-                      (err) => {
-                        if (err) {
-                          console.error(
-                            "Error inserting leave balance:",
-                            err.message
-                          );
-                          return res.status(500).json({
-                            message: "Failed to initialize leave balance",
-                          });
-                        }
-
-                        // Buat token
-                        const token = jwt.sign(
-                          { id: userId, role: role },
-                          process.env.JWT_SECRET,
-                          { expiresIn: "1h" }
-                        );
-
-                        res.status(201).json({
-                          user: {
-                            id: userId,
-                            name,
-                            email,
-                            role,
-                            division,
-                            annual_balance,
-                            annual_used,
-                          },
-                          token,
-                        });
-                      }
-                    );
                   }
-                );
-              });
-            });
+
+                  insertUser(
+                    name,
+                    email,
+                    password,
+                    roleId,
+                    divisionId,
+                    headprogramId,
+                    annual_balance,
+                    annual_used,
+                    is_approver,
+                    res
+                  );
+                }
+              );
+            } else {
+              insertUser(
+                name,
+                email,
+                password,
+                roleId,
+                divisionId,
+                null,
+                annual_balance,
+                annual_used,
+                is_approver,
+                res
+              );
+            }
           }
         );
       }
     );
   });
 });
+
+const insertHeadProgram = (headprogram) => {
+  return new Promise((resolve, reject) => {
+    db.query(
+      "INSERT INTO head_program (headprogram) VALUES (?)",
+      [headprogram],
+      (err, result) => {
+        if (err) {
+          console.error("Error inserting headprogram:", err.message);
+          return reject(err);
+        }
+        resolve(result.insertId); // Kembalikan ID headprogram yang baru
+      }
+    );
+  });
+};
+
+// Fungsi untuk menyisipkan pengguna ke dalam database
+const insertUser = (
+  name,
+  email,
+  password,
+  roleId,
+  divisionId,
+  headprogramId,
+  annual_balance,
+  annual_used,
+  is_approver,
+  res
+) => {
+  // Hash password dan simpan ke database
+  bcrypt.genSalt(10, (err, salt) => {
+    if (err) throw err;
+    bcrypt.hash(password, salt, (err, hashedPassword) => {
+      if (err) throw err;
+
+      const query =
+        "INSERT INTO users (name, email, password, roleId, divisionId, headprogramId) VALUES (?, ?, ?, ?, ?, ?)";
+
+      db.query(
+        query,
+        [name, email, hashedPassword, roleId, divisionId, headprogramId],
+        (err, result) => {
+          if (err) {
+            console.error("Error inserting user:", err.message);
+            return res.status(500).json({ message: "Failed to register user" });
+          }
+
+          const userId = result.insertId;
+          if (is_approver) {
+            db.query(
+              "INSERT INTO leave_approver (userId) VALUES (?)",
+              [userId],
+              (err, result) => {
+                if (err) {
+                  console.error(
+                    "Error inserting into leave_approver:",
+                    err.message
+                  );
+                  return res
+                    .status(500)
+                    .json({ message: "Failed to add approver" });
+                }
+              }
+            );
+          }
+
+          const leaveBalanceQuery =
+            "INSERT INTO leave_balance (userId, annual_balance, annual_used) VALUES (?, ?, ?)";
+          db.query(
+            leaveBalanceQuery,
+            [userId, annual_balance, annual_used],
+            (err) => {
+              if (err) {
+                console.error("Error inserting leave balance:", err.message);
+                return res
+                  .status(500)
+                  .json({ message: "Failed to initialize leave balance" });
+              }
+
+              const token = jwt.sign(
+                { id: userId, role: roleId },
+                process.env.JWT_SECRET,
+                { expiresIn: "1h" }
+              );
+
+              res.status(201).json({
+                user: {
+                  id: userId,
+                  name,
+                  email,
+                  roleId,
+                  divisionId,
+                  headprogramId,
+                  annual_balance,
+                  annual_used,
+                },
+                token,
+              });
+            }
+          );
+        }
+      );
+    });
+  });
+};
 
 // Login user
 app.post("/login", async (req, res) => {
@@ -542,6 +639,54 @@ app.get("/users/:id", (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
     res.json(result[0]);
+  });
+});
+
+//Input HeadProgram
+app.post("/headprogram", (req, res) => {
+  const { headprogram } = req.body;
+
+  // Validasi input
+  if (!headprogram) {
+    return res.status(400).json({ message: "Headprogam Input is required" });
+  }
+
+  // Query untuk insert ke tabel headprogram (hanya name)
+  const query = "INSERT INTO head_program (headprogram) VALUES (?)";
+
+  db.query(query, [headprogram], (err, result) => {
+    if (err) {
+      console.error("Error inserting headprogram:", err.message);
+      return res.status(500).json({ message: "Database Error", error: err });
+    }
+
+    // Response ketika berhasil menambahkan headprogram
+    res.status(201).json({
+      message: "Headprogram created successfully",
+      headprogramId: result.insertId,
+      headprogram,
+    });
+  });
+});
+
+//Get HeadProgram
+app.get("/headprogram/:headprogramId", (req, res) => {
+  const headprogramId = req.params.headprogramId;
+
+  // Query untuk mendapatkan headprogram berdasarkan ID
+  const query = "SELECT * FROM head_program WHERE headprogramId = ?";
+  db.query(query, [headprogramId], (err, result) => {
+    if (err) {
+      console.error("Error retrieving headprogram:", err.message);
+      return res.status(500).json({ message: "Database Error", error: err });
+    }
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: "Headprogram not found" });
+    }
+
+    // Return data headprogram
+    res.status(200).json(result[0]);
   });
 });
 
