@@ -263,59 +263,20 @@ app.post("/register", async (req, res) => {
               );
             }
 
-            // Cek apakah pengguna adalah headprogram
-            let headprogramId = null;
-            if (is_headprogram) {
-              db.query(
-                "SELECT * FROM head_program WHERE headprogram = ?",
-                [headprogram],
-                async (err, headprogramResults) => {
-                  if (err) {
-                    console.error("Error checking headprogram:", err.message);
-                    return res.status(500).json({ message: "DB Error" });
-                  }
-
-                  let headprogramId;
-                  if (headprogramResults.length > 0) {
-                    headprogramId = headprogramResults[0].headprogramId;
-                  } else {
-                    try {
-                      headprogramId = await insertHeadProgram(headprogram);
-                    } catch (error) {
-                      return res
-                        .status(500)
-                        .json({ message: "Failed to add headprogram" });
-                    }
-                  }
-
-                  insertUser(
-                    name,
-                    email,
-                    password,
-                    roleId,
-                    divisionId,
-                    headprogramId,
-                    annual_balance,
-                    annual_used,
-                    is_approver,
-                    res
-                  );
-                }
-              );
-            } else {
-              insertUser(
-                name,
-                email,
-                password,
-                roleId,
-                divisionId,
-                null,
-                annual_balance,
-                annual_used,
-                is_approver,
-                res
-              );
-            }
+            // Insert user ke tabel users
+            insertUser(
+              name,
+              email,
+              password,
+              roleId,
+              divisionId,
+              annual_balance,
+              annual_used,
+              is_headprogram,
+              headprogram,
+              is_approver,
+              res
+            );
           }
         );
       }
@@ -323,32 +284,16 @@ app.post("/register", async (req, res) => {
   });
 });
 
-const insertHeadProgram = (headprogram) => {
-  return new Promise((resolve, reject) => {
-    db.query(
-      "INSERT INTO head_program (headprogram) VALUES (?)",
-      [headprogram],
-      (err, result) => {
-        if (err) {
-          console.error("Error inserting headprogram:", err.message);
-          return reject(err);
-        }
-        resolve(result.insertId); // Kembalikan ID headprogram yang baru
-      }
-    );
-  });
-};
-
-// Fungsi untuk menyisipkan pengguna ke dalam database
 const insertUser = (
   name,
   email,
   password,
   roleId,
   divisionId,
-  headprogramId,
   annual_balance,
   annual_used,
+  is_headprogram,
+  headprogram,
   is_approver,
   res
 ) => {
@@ -359,11 +304,11 @@ const insertUser = (
       if (err) throw err;
 
       const query =
-        "INSERT INTO users (name, email, password, roleId, divisionId, headprogramId) VALUES (?, ?, ?, ?, ?, ?)";
+        "INSERT INTO users (name, email, password, roleId, divisionId) VALUES (?, ?, ?, ?, ?)";
 
       db.query(
         query,
-        [name, email, hashedPassword, roleId, divisionId, headprogramId],
+        [name, email, hashedPassword, roleId, divisionId],
         (err, result) => {
           if (err) {
             console.error("Error inserting user:", err.message);
@@ -371,60 +316,106 @@ const insertUser = (
           }
 
           const userId = result.insertId;
-          if (is_approver) {
+          let headprogramId = null;
+
+          // Jika user adalah headprogram, tambahkan ke tabel head_program
+          if (is_headprogram) {
             db.query(
-              "INSERT INTO leave_approver (userId) VALUES (?)",
-              [userId],
+              "INSERT INTO head_program (headprogram, userId) VALUES (?, ?)",
+              [headprogram, userId],
               (err, result) => {
                 if (err) {
-                  console.error(
-                    "Error inserting into leave_approver:",
-                    err.message
-                  );
+                  console.error("Error inserting headprogram:", err.message);
                   return res
                     .status(500)
-                    .json({ message: "Failed to add approver" });
+                    .json({ message: "Failed to add headprogram" });
                 }
-              }
-            );
-          }
 
-          const leaveBalanceQuery =
-            "INSERT INTO leave_balance (userId, annual_balance, annual_used) VALUES (?, ?, ?)";
-          db.query(
-            leaveBalanceQuery,
-            [userId, annual_balance, annual_used],
-            (err) => {
-              if (err) {
-                console.error("Error inserting leave balance:", err.message);
-                return res
-                  .status(500)
-                  .json({ message: "Failed to initialize leave balance" });
-              }
+                headprogramId = result.insertId;
 
-              const token = jwt.sign(
-                { id: userId, role: roleId },
-                process.env.JWT_SECRET,
-                { expiresIn: "1h" }
-              );
-
-              res.status(201).json({
-                user: {
-                  id: userId,
+                // Lanjutkan dengan insert leave balance dan approver jika ada
+                completeUserInsert(
                   name,
-                  email,
+                  userId,
                   roleId,
-                  divisionId,
-                  headprogramId,
                   annual_balance,
                   annual_used,
-                },
-                token,
-              });
-            }
-          );
+                  is_approver,
+                  headprogramId,
+                  res
+                );
+              }
+            );
+          } else {
+            // Lanjutkan tanpa headprogram
+            completeUserInsert(
+              name,
+              userId,
+              roleId,
+              annual_balance,
+              annual_used,
+              is_approver,
+              headprogramId,
+              res
+            );
+          }
         }
       );
+    });
+  });
+};
+
+const completeUserInsert = (
+  name,
+  userId,
+  roleId,
+  annual_balance,
+  annual_used,
+  is_approver,
+  headprogramId,
+  res
+) => {
+  // Insert leave balance
+  const leaveBalanceQuery =
+    "INSERT INTO leave_balance (userId, annual_balance, annual_used) VALUES (?, ?, ?)";
+  db.query(leaveBalanceQuery, [userId, annual_balance, annual_used], (err) => {
+    if (err) {
+      console.error("Error inserting leave balance:", err.message);
+      return res
+        .status(500)
+        .json({ message: "Failed to initialize leave balance" });
+    }
+
+    // Insert ke leave_approver jika user adalah approver
+    if (is_approver) {
+      db.query(
+        "INSERT INTO leave_approver (userId) VALUES (?)",
+        [userId],
+        (err) => {
+          if (err) {
+            console.error("Error inserting leave approver:", err.message);
+            return res.status(500).json({ message: "Failed to add approver" });
+          }
+        }
+      );
+    }
+
+    // Berikan respon sukses dengan token dan data pengguna
+    const token = jwt.sign(
+      { id: userId, role: roleId },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.status(201).json({
+      user: {
+        id: userId,
+        name,
+        annual_balance,
+        annual_used,
+      },
+      headprogramId, // Tambahkan headprogramId di respons
+      token,
     });
   });
 };
@@ -930,6 +921,19 @@ function insertLeaveRequest(data, callback) {
   );
 }
 
+function updateAnnualUsed(userId, callback) {
+  const query = `UPDATE leave_balance SET annual_used = annual_used + 1 WHERE userId = ?`;
+
+  db.query(query, [userId], (err, result) => {
+    if (err) {
+      console.error("Error updating annual leave balance:", err.message);
+      return callback(err);
+    }
+
+    callback(null, result);
+  });
+}
+
 app.post("/leave-request", upload.single("upload_image"), (req, res) => {
   const {
     name,
@@ -1000,9 +1004,18 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
                 return res.status(500).json({ message: "DB Error" });
               }
 
-              res
-                .status(201)
-                .json({ message: "Leave request submitted successfully" });
+              updateAnnualUsed(userId, (err) => {
+                if (err) {
+                  return res
+                    .status(500)
+                    .json({ message: "Error updating leave balance" });
+                }
+
+                res.status(201).json({
+                  message:
+                    "Leave request submitted successfully, annual leave balance updated",
+                });
+              });
             }
           );
         });
