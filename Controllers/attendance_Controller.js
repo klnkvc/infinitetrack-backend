@@ -1,6 +1,6 @@
 // controllers/attendance_Controller.js
 const { infinite_track_connection: db } = require("../config/dbconfig");
-const { haversineDistance } = require("../utils/geofenceUtils");
+const { haversineDistance } = require("../utils/geofence");
 
 // lokasi kantor
 const officeLocation = { latitude: 1.117, longitude: 104.048 }; // Infinite Learning, Batam
@@ -11,7 +11,7 @@ const checkIn = (req, res) => {
   const userId = req.user.id;
 
   // Validasi geofence (radius dalam meter)
-  const allowedRadius = 500; // 500 meter
+  const allowedRadius = 125; // 125 meter
   const userLocation = { latitude, longitude };
 
   const distance = haversineDistance(officeLocation, userLocation);
