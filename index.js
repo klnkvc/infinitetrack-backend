@@ -50,11 +50,11 @@ const storage = multer.diskStorage({
   },
 });
 
-// Set upload middleware
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 1024 * 1024 * 5 }, // Batas ukuran file 5MB
-});
+// // Set upload middleware
+// const upload = multer({
+//   storage: storage,
+//   limits: { fileSize: 1024 * 1024 * 5 }, // Batas ukuran file 5MB
+// });
 
 // Routes
 app.use(authRoutes);

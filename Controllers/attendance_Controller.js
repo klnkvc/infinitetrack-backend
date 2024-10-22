@@ -1,10 +1,23 @@
 // controllers/attendance_Controller.js
 const { infinite_track_connection: db } = require("../config/dbconfig");
+const { haversineDistance } = require("../utils/geofenceUtils");
+
+// lokasi kantor
+const officeLocation = { latitude: 1.117, longitude: 104.048 }; // Infinite Learning, Batam
 
 const checkIn = (req, res) => {
-  const { attendance_category } = req.body;
+  const { attendance_category, latitude, longitude } = req.body;
   const attendance_category_id = getAttendanceCategoryId(attendance_category);
   const userId = req.user.id;
+
+  // Validasi geofence (radius dalam meter)
+  const allowedRadius = 500; // 500 meter
+  const userLocation = { latitude, longitude };
+
+  const distance = haversineDistance(officeLocation, userLocation);
+  if (distance > allowedRadius) {
+    return res.status(400).json({ message: "Location out of allowed radius" });
+  }
 
   const now = new Date();
   const currentHour = now.getHours();
@@ -24,8 +37,15 @@ const checkIn = (req, res) => {
   }
 
   db.query(
-    "INSERT INTO attendance (check_in_time, check_out_time,  userId, attendance_category_id, attendance_status_id, attendance_date, upload_image) VALUES (NOW(), NULL, ?, ?, ?, CURDATE(), ?)",
-    [userId, attendance_category_id, attendance_status_id, upload_image],
+    "INSERT INTO attendance (check_in_time, check_out_time, userId, attendance_category_id, attendance_status_id, attendance_date, latitude, longitude, upload_image) VALUES (NOW(), NULL, ?, ?, ?, CURDATE(), ?, ?, ?)",
+    [
+      userId,
+      attendance_category_id,
+      attendance_status_id,
+      latitude,
+      longitude,
+      upload_image,
+    ],
     (err, result) => {
       if (err) {
         console.error("Error during check-in:", err.message);

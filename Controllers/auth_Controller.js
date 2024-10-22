@@ -3,6 +3,8 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { infinite_track_connection: db } = require("../dbconfig.js");
 
+let otpVerifiedCache = {};
+
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
@@ -98,6 +100,65 @@ const loginUser = async (req, res) => {
             annualUsed,
           });
         });
+      });
+    });
+  });
+};
+
+exports.resetPassword = (req, res) => {
+  const { email, newPassword } = req.body;
+
+  // Cek apakah email dan password baru disertakan
+  if (!email || !newPassword) {
+    return res
+      .status(400)
+      .json({ message: "Email and new password are required" });
+  }
+
+  // Cek apakah email ada di database
+  db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
+    if (err) {
+      console.error("Error checking user:", err.message);
+      return res.status(500).json({ message: "DB Error" });
+    }
+
+    if (results.length === 0) {
+      return res.status(400).json({ message: "User not registered" });
+    }
+
+    // Cek apakah OTP sudah diverifikasi
+    if (!otpVerifiedCache.hasOwnProperty(email)) {
+      return res
+        .status(400)
+        .json({ message: "OTP not verified for this email" });
+    }
+
+    // Hash password baru
+    bcrypt.genSalt(10, (err, salt) => {
+      if (err) throw err;
+      bcrypt.hash(newPassword, salt, (err, hashedPassword) => {
+        if (err) throw err;
+
+        // Update password di database
+        const queryUpdatePassword =
+          "UPDATE users SET password = ? WHERE email = ?";
+        db.query(
+          queryUpdatePassword,
+          [hashedPassword, email],
+          (err, result) => {
+            if (err) {
+              console.error("Error updating password:", err.message);
+              return res
+                .status(500)
+                .json({ message: "Failed to reset password" });
+            }
+
+            // Hapus status verifikasi OTP setelah password berhasil direset
+            delete otpVerifiedCache[email];
+
+            res.status(200).json({ message: "Password successfully reset" });
+          }
+        );
       });
     });
   });
