@@ -18,13 +18,6 @@ const upload = multer({ storage });
 
 const router = express.Router();
 
-router.post(
-  "/attendance/checkin",
-  verifyToken,
-  upload.single("upload_image"),
-  checkIn
-);
-
 // Route untuk Check-In
 router.post(
   "/attendance/checkin",

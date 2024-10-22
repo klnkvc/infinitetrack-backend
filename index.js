@@ -10,7 +10,6 @@ require("dotenv").config();
 
 // Import routes
 const { verifyToken, checkRole } = require("./middleware/authMiddleWare.js");
-const { infinite_track_connection: db } = require("./dbconfig.js");
 const attendanceRoutes = require("./routes/attendanceRoutes.js");
 const authRoutes = require("./routes/authRoutes.js");
 const headProgramRoutes = require("./routes/headProgramRoutes.js");
@@ -57,12 +56,12 @@ const storage = multer.diskStorage({
 // });
 
 // Routes
-app.use(authRoutes);
-app.use(attendanceRoutes);
-app.use(headProgramRoutes);
-app.use(otpRoutes);
-app.use(userRoutes);
-app.use(leaveRequestRoutes);
+app.use("/auth", authRoutes);
+app.use("/attendance", verifyToken, attendanceRoutes);
+app.use("/head-program", verifyToken, headProgramRoutes);
+app.use("/otp", verifyToken, otpRoutes);
+app.use("/users", verifyToken, userRoutes);
+app.use("/leave-request", verifyToken, leaveRequestRoutes);
 
 // Start server
 app.listen(port, "0.0.0.0", () => {
