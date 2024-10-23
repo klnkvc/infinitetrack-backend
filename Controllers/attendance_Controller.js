@@ -12,7 +12,10 @@ const checkIn = (req, res) => {
 
   // Validasi geofence (radius dalam meter)
   const allowedRadius = 125; // 125 meter
-  const userLocation = { latitude, longitude };
+  const userLocation = {
+    latitude: parseFloat(latitude),
+    longitude: parseFloat(longitude),
+  };
 
   const distance = haversineDistance(officeLocation, userLocation);
   if (distance > allowedRadius) {
@@ -42,8 +45,8 @@ const checkIn = (req, res) => {
       userId,
       attendance_category_id,
       attendance_status_id,
-      latitude,
-      longitude,
+      userLocation.latitude,
+      userLocation.longitude,
       upload_image,
     ],
     (err, result) => {

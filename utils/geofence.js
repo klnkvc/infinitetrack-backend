@@ -1,21 +1,24 @@
-// Menghitung jarak antara dua titik (koordinat) menggunakan rumus Haversine
-function haversineDistance(coord1, coord2) {
-  const toRad = (x) => (x * Math.PI) / 180;
+// utils/geofence.js
+function haversineDistance(coords1, coords2) {
+  function toRad(x) {
+    return (x * Math.PI) / 180;
+  }
 
   const R = 6371e3; // Radius bumi dalam meter
-  const dLat = toRad(coord2.latitude - coord1.latitude);
-  const dLon = toRad(coord2.longitude - coord1.longitude);
-
-  const lat1 = toRad(coord1.latitude);
-  const lat2 = toRad(coord2.latitude);
+  const lat1 = toRad(coords1.latitude);
+  const lat2 = toRad(coords2.latitude);
+  const deltaLat = toRad(coords2.latitude - coords1.latitude);
+  const deltaLon = toRad(coords2.longitude - coords1.longitude);
 
   const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(deltaLon / 2) *
+      Math.sin(deltaLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-  const distance = R * c; // Jarak dalam meter
-  return distance;
+  return R * c; // Jarak dalam meter
 }
 
 module.exports = {
