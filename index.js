@@ -8,6 +8,7 @@ const cookieParser = require("cookie-parser");
 const { verifyToken, checkRole } = require("./middleware/authMiddleWare.js");
 const { infinite_track_connection: db } = require("./dbconfig.js");
 const sendOTP = require("./utils/nodeMailer");
+const { haversineDistance } = require("./utils/geofence.js");
 const multer = require("multer");
 const path = require("path");
 require("dotenv").config();
@@ -38,6 +39,9 @@ const getAttendanceCategoryId = (category) => {
 const getAttendanceStatusId = (status) => {
   return status === "late" ? 1 : 2; // 1 untuk Late, 2 untuk Confirm
 };
+
+// Lokasi kantor
+const officeLocation = { latitude: 1.117, longitude: 104.048 }; //lokasi Infinite Learning
 
 // Set storage for Multer
 const storage = multer.diskStorage({
@@ -702,9 +706,27 @@ app.post(
   verifyToken,
   upload.single("upload_image"),
   (req, res) => {
-    const { attendance_category } = req.body;
+    const { attendance_category, latitude, longitude } = req.body;
     const attendance_category_id = getAttendanceCategoryId(attendance_category);
     const userId = req.user.id;
+
+    // Validasi geofence (radius dalam meter)
+    const allowedRadius = 125; // 125 meter
+    const userLocation = {
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude),
+    };
+
+    const distance = haversineDistance(officeLocation, userLocation);
+
+    // Log jarak untuk debugging
+    console.log("Distance calculated:", distance, "meters");
+
+    if (distance > allowedRadius) {
+      return res
+        .status(400)
+        .json({ message: "Location out of allowed radius" });
+    }
 
     const now = new Date();
     const currentHour = now.getHours();
@@ -726,8 +748,15 @@ app.post(
     }
 
     db.query(
-      "INSERT INTO attendance (check_in_time, check_out_time,  userId, attendance_category_id, attendance_status_id, attendance_date, upload_image) VALUES (NOW(), NULL, ?, ?, ?, CURDATE(), ?)",
-      [userId, attendance_category_id, attendance_status_id, upload_image],
+      "INSERT INTO attendance (check_in_time, check_out_time, userId, attendance_category_id, attendance_status_id, attendance_date, latitude, longitude, upload_image) VALUES (NOW(), NULL, ?, ?, ?, CURDATE(), ?, ?, ?)",
+      [
+        userId,
+        attendance_category_id,
+        attendance_status_id,
+        userLocation.latitude,
+        userLocation.longitude,
+        upload_image,
+      ],
       (err, result) => {
         if (err) {
           console.error("Error during check-in:", err.message);
