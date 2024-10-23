@@ -89,7 +89,7 @@ const checkOut = (req, res) => {
   let attendance_status_id = currentHour > 17 ? 3 : 1;
 
   db.query(
-    "INSERT INTO attendance (check_in_time, check_out_time,  userId, attendance_category_id, attendance_status_id, attendance_date) VALUES (NULL, NOW(), ?, ?, ?, CURDATE())",
+    "INSERT INTO attendance (check_in_time, check_out_time, userId, attendance_category_id, attendance_status_id, attendance_date) VALUES (NULL, NOW(), ?, ?, ?, CURDATE())",
     [userId, attendance_category_id, attendance_status_id],
     (err, result) => {
       if (err) {
