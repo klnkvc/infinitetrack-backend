@@ -196,6 +196,7 @@ app.post("/register", async (req, res) => {
       annual_balance,
       annual_used,
       isHeadProgram, // menambahkan flag untuk head_program
+      isApprover,
     } = req.body;
 
     // Validasi input wajib
@@ -207,7 +208,8 @@ app.post("/register", async (req, res) => {
       !position ||
       annual_balance === undefined ||
       annual_used === undefined ||
-      isHeadProgram === undefined // pastikan flag ini diberikan
+      isHeadProgram === undefined ||
+      isApprover === undefined
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
@@ -316,7 +318,8 @@ app.post("/register", async (req, res) => {
       positionId,
       annual_balance,
       annual_used,
-      isHeadProgram, // tambahkan flag isHeadProgram ke dalam fungsi insertUser
+      isHeadProgram,
+      isApprover,
       res
     );
   } catch (err) {
@@ -336,7 +339,8 @@ const insertUser = async (
   positionId,
   annual_balance,
   annual_used,
-  isHeadProgram, // flag apakah user adalah head program
+  isHeadProgram,
+  isApprover,
   res
 ) => {
   try {
@@ -353,12 +357,17 @@ const insertUser = async (
       [userId, annual_balance, annual_used]
     );
 
-    // Jika user adalah head program, insert ke tabel head_program
     if (isHeadProgram) {
       await queryAsync(
         "INSERT INTO head_program (userId, programId) VALUES (?, ?)",
         [userId, programId]
       );
+    }
+
+    if (isApprover) {
+      await queryAsync("INSERT INTO leave_approver (userId) VALUES (?)", [
+        userId,
+      ]);
     }
 
     const token = jwt.sign(
