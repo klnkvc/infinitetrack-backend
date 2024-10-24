@@ -41,7 +41,10 @@ const getAttendanceStatusId = (status) => {
 };
 
 // Lokasi kantor
-const officeLocation = { latitude: 1.117, longitude: 104.048 }; //lokasi Infinite Learning
+const officeLocation = {
+  latitude: 1.1853258302684722,
+  longitude: 104.10194910214162,
+}; //lokasi Infinite Learning
 
 // Set storage for Multer
 const storage = multer.diskStorage({
