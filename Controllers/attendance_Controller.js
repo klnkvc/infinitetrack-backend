@@ -3,7 +3,10 @@ const { infinite_track_connection: db } = require("../config/dbconfig");
 const { haversineDistance } = require("../utils/geofence");
 
 // lokasi kantor
-const officeLocation = { latitude: 1.117, longitude: 104.048 }; // Infinite Learning, Batam
+const officeLocation = {
+  latitude: 1.1853258302684722,
+  longitude: 104.10194910214162,
+}; // Infinite Learning, Batam
 
 const checkIn = (req, res) => {
   const { attendance_category, latitude, longitude } = req.body;
