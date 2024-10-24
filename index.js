@@ -911,11 +911,29 @@ function getUserIdByName(name, callback) {
   });
 }
 
-function getHeadProgramIdByheadProgram(headprogram, callback) {
-  const query =
-    "SELECT headprogramId FROM head_program WHERE headprogram = ? LIMIT 1"; // Ambil userId dari tabel users berdasarkan name
+function getProgramIdByProgramName(programName, callback) {
+  const query = "SELECT programId FROM programs WHERE programName = ? LIMIT 1"; // Ambil userId dari tabel users berdasarkan name
 
-  db.query(query, [headprogram], (err, result) => {
+  db.query(query, [programName], (err, result) => {
+    if (err) {
+      console.error("Error fetching programId:", err.message);
+      return callback(err, null);
+    }
+
+    if (result.length === 0) {
+      return callback(new Error("Program not found"), null);
+    }
+
+    const programId = result[0].programId;
+    callback(null, programId);
+  });
+}
+
+function getHeadProgramIdByProgramId(programId, callback) {
+  const query =
+    "SELECT headprogramId FROM head_program WHERE programId = ? LIMIT 1"; // Ambil userId dari tabel users berdasarkan name
+
+  db.query(query, [programId], (err, result) => {
     if (err) {
       console.error("Error fetching headprogramId:", err.message);
       return callback(err, null);
@@ -967,39 +985,6 @@ function getLeavetypeIdByLeaveType(leavetype, callback) {
   });
 }
 
-function insertLeaveRequest(data, callback) {
-  const leavestatusId = data.leavestatusId || 1;
-
-  const query = `INSERT INTO leave_users 
-    (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-  db.query(
-    query,
-    [
-      data.userId,
-      data.headprogramId,
-      data.divisionId,
-      data.start_date,
-      data.end_date,
-      data.leavetypeId,
-      data.description,
-      data.phone,
-      data.address,
-      data.upload_image,
-      leavestatusId,
-    ],
-    (err, result) => {
-      if (err) {
-        console.error("Error inserting leave request:", err.message);
-        return callback(err, null);
-      }
-
-      callback(null, result);
-    }
-  );
-}
-
 function updateAnnualUsed(userId, callback) {
   const query = `UPDATE leave_balance SET annual_used = annual_used + 1 WHERE userId = ?`;
 
@@ -1016,7 +1001,7 @@ function updateAnnualUsed(userId, callback) {
 app.post("/leave-request", upload.single("upload_image"), (req, res) => {
   const {
     name,
-    headprogram,
+    programName,
     division,
     start_date,
     end_date,
@@ -1031,7 +1016,7 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
   // Validasi input
   if (
     !name ||
-    !headprogram ||
+    !programName ||
     !division ||
     !start_date ||
     !end_date ||
@@ -1050,7 +1035,7 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
       return res.status(500).json({ message: err.message });
     }
 
-    getHeadProgramIdByheadProgram(headprogram, (err, headprogramId) => {
+    getProgramIdByProgramName(programName, (err, programId) => {
       if (err) {
         return res.status(500).json({ message: err.message });
       }
@@ -1068,7 +1053,7 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
           insertLeaveRequest(
             {
               userId,
-              headprogramId,
+              programId,
               divisionId,
               start_date,
               end_date,
@@ -1102,6 +1087,45 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
     });
   });
 });
+
+function insertLeaveRequest(data, callback) {
+  const leavestatusId = data.leavestatusId || 1;
+
+  getHeadProgramIdByProgramId(data.programId, (err, headprogramId) => {
+    if (err) {
+      return res.status(500).json({ message: err.message });
+    }
+
+    const query = `INSERT INTO leave_users 
+    (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+    db.query(
+      query,
+      [
+        data.userId,
+        headprogramId,
+        data.divisionId,
+        data.start_date,
+        data.end_date,
+        data.leavetypeId,
+        data.description,
+        data.phone,
+        data.address,
+        data.upload_image,
+        leavestatusId,
+      ],
+      (err, result) => {
+        if (err) {
+          console.error("Error inserting leave request:", err.message);
+          return callback(err, null);
+        }
+
+        callback(null, result);
+      }
+    );
+  });
+}
 
 // Start server
 app.listen(port, "0.0.0.0", () => {
