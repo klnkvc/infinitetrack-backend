@@ -863,8 +863,8 @@ app.post("/attendance/checkout", verifyToken, (req, res) => {
     [userId, attendance_category_id, attendance_status_id],
     (err, result) => {
       if (err) {
-        console.error("Error during check-in:", err.message);
-        return res.status(500).json({ message: "Failed to check in" });
+        console.error("Error during check-out:", err.message);
+        return res.status(500).json({ message: "Failed to check-out" });
       }
 
       const attendanceId = result.insertId;
