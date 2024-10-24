@@ -195,8 +195,10 @@ app.post("/register", async (req, res) => {
       position,
       annual_balance,
       annual_used,
+      isHeadProgram, // menambahkan flag untuk head_program
     } = req.body;
 
+    // Validasi input wajib
     if (
       !name ||
       !email ||
@@ -204,11 +206,13 @@ app.post("/register", async (req, res) => {
       !role ||
       !position ||
       annual_balance === undefined ||
-      annual_used === undefined
+      annual_used === undefined ||
+      isHeadProgram === undefined // pastikan flag ini diberikan
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
+    // Cek apakah user sudah ada berdasarkan email
     const existingUser = await queryAsync(
       "SELECT * FROM users WHERE email = ?",
       [email]
@@ -217,6 +221,7 @@ app.post("/register", async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
+    // Proses role
     let roleResults = await queryAsync("SELECT * FROM roles WHERE role = ?", [
       role,
     ]);
@@ -233,7 +238,27 @@ app.post("/register", async (req, res) => {
 
     let divisionId = null;
     let programId = null;
-    if (is_hasDivision && is_hasProgram) {
+
+    // Jika user adalah head program, hanya butuh program
+    if (isHeadProgram) {
+      // Proses program
+      let programResults = await queryAsync(
+        "SELECT * FROM programs WHERE programName = ?",
+        [program]
+      );
+      if (programResults.length > 0) {
+        programId = programResults[0].programId;
+      } else {
+        const programInsertResult = await queryAsync(
+          "INSERT INTO programs (programName) VALUES (?)",
+          [program]
+        );
+        programId = programInsertResult.insertId;
+      }
+    }
+    // Jika user bukan head program, proses division dan program
+    else if (is_hasDivision && is_hasProgram) {
+      // Proses program
       let programResults = await queryAsync(
         "SELECT * FROM programs WHERE programName = ?",
         [program]
@@ -248,6 +273,7 @@ app.post("/register", async (req, res) => {
         programId = programInsertResult.insertId;
       }
 
+      // Proses division
       let divisionResults = await queryAsync(
         "SELECT * FROM divisions WHERE division = ?",
         [division]
@@ -263,6 +289,7 @@ app.post("/register", async (req, res) => {
       }
     }
 
+    // Proses position
     let positionResults = await queryAsync(
       "SELECT * FROM positions WHERE positionName = ?",
       [position]
@@ -278,6 +305,7 @@ app.post("/register", async (req, res) => {
       positionId = positionInsertResult.insertId;
     }
 
+    // Insert user baru
     await insertUser(
       name,
       email,
@@ -288,6 +316,7 @@ app.post("/register", async (req, res) => {
       positionId,
       annual_balance,
       annual_used,
+      isHeadProgram, // tambahkan flag isHeadProgram ke dalam fungsi insertUser
       res
     );
   } catch (err) {
@@ -296,6 +325,7 @@ app.post("/register", async (req, res) => {
   }
 });
 
+// Fungsi insertUser
 const insertUser = async (
   name,
   email,
@@ -306,6 +336,7 @@ const insertUser = async (
   positionId,
   annual_balance,
   annual_used,
+  isHeadProgram, // flag apakah user adalah head program
   res
 ) => {
   try {
@@ -321,6 +352,14 @@ const insertUser = async (
       "INSERT INTO leave_balance (userId, annual_balance, annual_used) VALUES (?, ?, ?)",
       [userId, annual_balance, annual_used]
     );
+
+    // Jika user adalah head program, insert ke tabel head_program
+    if (isHeadProgram) {
+      await queryAsync(
+        "INSERT INTO head_program (userId, programId) VALUES (?, ?)",
+        [userId, programId]
+      );
+    }
 
     const token = jwt.sign(
       { id: userId, role: roleId },
