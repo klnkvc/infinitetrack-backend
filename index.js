@@ -985,10 +985,18 @@ function getLeavetypeIdByLeaveType(leavetype, callback) {
   });
 }
 
-function updateAnnualUsed(userId, callback) {
-  const query = `UPDATE leave_balance SET annual_used = annual_used + 1 WHERE userId = ?`;
+function updateAnnualUsed(userId, startDate, endDate, callback) {
+  // Hitung selisih hari antara start_date dan end_date
+  const start = new Date(startDate);
+  const end = new Date(endDate);
 
-  db.query(query, [userId], (err, result) => {
+  // Menghitung jumlah hari antara start_date dan end_date
+  const diffTime = Math.abs(end - start);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // Tambahkan 1 agar inklusif
+
+  const query = `UPDATE leave_balance SET annual_used = annual_used + ? WHERE userId = ?`;
+
+  db.query(query, [diffDays, userId], (err, result) => {
     if (err) {
       console.error("Error updating annual leave balance:", err.message);
       return callback(err);
@@ -1069,7 +1077,7 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
               }
 
               if (leavetypeId === 4) {
-                updateAnnualUsed(userId, (err) => {
+                updateAnnualUsed(userId, start_date, end_date, (err) => {
                   if (err) {
                     return res
                       .status(500)
