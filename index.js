@@ -10,6 +10,7 @@ const { infinite_track_connection: db } = require("./dbconfig.js");
 const sendOTP = require("./utils/nodeMailer");
 const { haversineDistance } = require("./utils/geofence.js");
 const multer = require("multer");
+const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
 
@@ -1043,7 +1044,7 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
     address,
   } = req.body;
 
-  const upload_image = req.file.path ? req.file.filename : null;
+  const upload_image = req.file ? req.file.filename : null;
 
   if (
     !name ||
@@ -1057,39 +1058,70 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
     !address ||
     !upload_image
   ) {
+    if (upload_image) {
+      fs.unlink(req.file.path, (err) => {
+        if (err) {
+          console.error("Error deleting the file:", err);
+        }
+      });
+    }
     return res.status(400).json({ message: "All fields are required" });
   }
 
   getUserIdByName(name, (err, userId) => {
     if (err) {
+      if (upload_image) {
+        fs.unlink(req.file.path, (err) => {
+          if (err) console.error("Error deleting the file:", err);
+        });
+      }
       return res.status(500).json({ message: err.message });
     }
 
     getProgramIdByProgramName(programName, (err, programId) => {
       if (err) {
+        if (upload_image) {
+          fs.unlink(req.file.path, (err) => {
+            if (err) console.error("Error deleting the file:", err);
+          });
+        }
         return res.status(500).json({ message: err.message });
       }
 
       getDivisionIdByDivision(division, (err, divisionId) => {
         if (err) {
+          if (upload_image) {
+            fs.unlink(req.file.path, (err) => {
+              if (err) console.error("Error deleting the file:", err);
+            });
+          }
           return res.status(500).json({ message: err.message });
         }
 
         getLeavetypeIdByLeaveType(leavetype, (err, leavetypeId) => {
           if (err) {
+            if (upload_image) {
+              fs.unlink(req.file.path, (err) => {
+                if (err) console.error("Error deleting the file:", err);
+              });
+            }
             return res.status(500).json({ message: err.message });
           }
 
           if (leavetypeId === 4) {
             checkAnnualUsage(userId, (err, leaveBalance) => {
               if (err) {
+                if (upload_image) {
+                  fs.unlink(req.file.path, (err) => {
+                    if (err) console.error("Error deleting the file:", err);
+                  });
+                }
                 return res
                   .status(500)
                   .json({ message: "Error checking leave balance" });
               }
 
               const { annual_used, annual_balance } = leaveBalance;
-
               const start = new Date(start_date);
               const end = new Date(end_date);
               const diffTime = Math.abs(end - start);
@@ -1097,6 +1129,11 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
                 Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
               if (annual_used + daysRequested > annual_balance) {
+                if (upload_image) {
+                  fs.unlink(req.file.path, (err) => {
+                    if (err) console.error("Error deleting the file:", err);
+                  });
+                }
                 return res.status(400).json({
                   message:
                     "You Have Reached Your Annual Limit. Leave Rejected. Please Wait for New Annual Leave :D",
@@ -1105,6 +1142,11 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
 
               updateAnnualUsed(userId, start_date, end_date, (err) => {
                 if (err) {
+                  if (upload_image) {
+                    fs.unlink(req.file.path, (err) => {
+                      if (err) console.error("Error deleting the file:", err);
+                    });
+                  }
                   return res
                     .status(500)
                     .json({ message: "Error updating leave balance" });
