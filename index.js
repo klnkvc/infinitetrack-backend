@@ -1076,16 +1076,16 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
                       .json({ message: "Error updating leave balance" });
                   }
 
-                  res.status(201).json({
+                  return res.status(201).json({
                     message:
                       "Leave request submitted successfully, annual leave balance updated",
                   });
                 });
+              } else {
+                res.status(201).json({
+                  message: "Leave request submitted successfully",
+                });
               }
-
-              res.status(201).json({
-                message: "Leave request submitted successfully",
-              });
             }
           );
         });
