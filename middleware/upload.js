@@ -8,12 +8,15 @@ const storage = multer.diskStorage({
     cb(null, "./uploads/"); // Menentukan direktori tempat menyimpan file
   },
   filename: function (req, file, cb) {
-    // Menggunakan nama asli file dengan tambahan timestamp untuk menghindari bentrok nama
-    const uniqueSuffix = Date.now();
-    cb(
-      null,
-      uniqueSuffix + "-" + file.originalname // Menggabungkan timestamp dan nama asli file
-    );
+    // Menggunakan nama asli file dengan tambahan tanggal untuk menghindari bentrok nama
+    const currentDate = new Date();
+    const formattedDate = currentDate
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, ""); // Format: YYYYMMDD
+    const originalName = file.originalname.replace(/\s+/g, "_"); // Mengganti spasi dengan underscore jika ada
+
+    cb(null, `${formattedDate}-${originalName}`); // Menggabungkan tanggal dan nama asli file
   },
 });
 
