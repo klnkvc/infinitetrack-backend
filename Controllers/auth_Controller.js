@@ -35,77 +35,155 @@ const loginUser = async (req, res) => {
         return res.status(400).json({ message: "Role not found" });
       }
 
-      const userRole = roleResult[0].role; // Ambil nama role
+      const userRole = roleResult[0].role;
 
-      // Ambil division berdasarkan divisionId dari pengguna
-      const queryFindDivision = "SELECT * FROM divisions WHERE divisionId = ?";
-      db.query(queryFindDivision, [user.divisionId], (err, divisionResult) => {
+      // Ambil position berdasarkan positionId dari pengguna
+      let positionName = null; // Default jika tidak ada posisi
+      if (user.positionId) {
+        const queryFindPosition =
+          "SELECT positionName FROM positions WHERE positionId = ?";
+        db.query(
+          queryFindPosition,
+          [user.positionId],
+          (err, positionResult) => {
+            if (err) {
+              return res
+                .status(500)
+                .json({ message: "Database error", error: err });
+            }
+
+            if (positionResult.length > 0) {
+              positionName = positionResult[0].positionName; // Ambil nama posisi jika ditemukan
+            }
+
+            // Lanjutkan dengan pencarian division dan leave balance
+            handleDivisionAndLeaveBalance(user, userRole, positionName, res);
+          }
+        );
+      } else {
+        // Jika user tidak memiliki positionId, langsung lanjut ke pencarian division dan leave balance
+        handleDivisionAndLeaveBalance(user, userRole, positionName, res);
+      }
+    });
+  });
+};
+
+function handleDivisionAndLeaveBalance(user, userRole, positionName, res) {
+  if (user.divisionId) {
+    const queryFindDivision = "SELECT * FROM divisions WHERE divisionId = ?";
+    db.query(queryFindDivision, [user.divisionId], (err, divisionResult) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err });
+      }
+
+      // Cek jika user tidak memiliki divisi
+      const division =
+        divisionResult.length > 0 ? divisionResult[0].division : null;
+
+      // Ambil annual_balance dan annual_used dari leave_balance berdasarkan userId
+      const queryFindLeaveBalance =
+        "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+      db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
         if (err) {
           return res
             .status(500)
             .json({ message: "Database error", error: err });
         }
 
-        const division = divisionResult[0].division; // Ambil nama division
+        let annualBalance = 0;
+        let annualUsed = 0;
 
-        // Ambil annual_balance dan annual_used dari leave_balance berdasarkan userId
-        const queryFindLeaveBalance =
-          "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
-        db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
-          if (err) {
-            return res
-              .status(500)
-              .json({ message: "Database error", error: err });
-          }
+        if (balanceResult.length > 0) {
+          annualBalance = balanceResult[0].annual_balance;
+          annualUsed = balanceResult[0].annual_used;
+        }
 
-          let annualBalance = 0; // Nilai default jika tidak ada data
-          let annualUsed = 0; // Nilai default jika tidak ada data
-
-          if (balanceResult.length > 0) {
-            annualBalance = balanceResult[0].annual_balance;
-            annualUsed = balanceResult[0].annual_used;
-          }
-
-          // Buat token setelah validasi sukses
-          const token = jwt.sign(
-            { id: user.userId, role: user.roleId },
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-          );
-
-          const userId = user.userId;
-          const userName = user.name;
-          const currentHour = new Date().getHours();
-          let greeting;
-
-          if (currentHour >= 5 && currentHour < 12) {
-            greeting = "Good Morning 🌞";
-          } else if (currentHour >= 12 && currentHour < 17) {
-            greeting = "Good Afternoon ☀️";
-          } else if (currentHour >= 17 && currentHour < 21) {
-            greeting = "Good Evening 🌤️";
-          } else {
-            greeting = "Good Night 🌙";
-          }
-
-          // Kirim respons dengan token, userId, userName, userRole, division, greeting, annual_balance, dan annual_used
-          res.json({
-            token,
-            userId,
-            userName,
-            userRole,
-            division,
-            greeting,
-            annualBalance,
-            annualUsed,
-          });
-        });
+        sendResponse(
+          res,
+          user,
+          userRole,
+          division,
+          positionName,
+          annualBalance,
+          annualUsed
+        );
       });
     });
-  });
-};
+  } else {
+    // Jika user tidak memiliki divisionId
+    const queryFindLeaveBalance =
+      "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+    db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error", error: err });
+      }
 
-exports.resetPassword = (req, res) => {
+      let annualBalance = 0;
+      let annualUsed = 0;
+
+      if (balanceResult.length > 0) {
+        annualBalance = balanceResult[0].annual_balance;
+        annualUsed = balanceResult[0].annual_used;
+      }
+
+      sendResponse(
+        res,
+        user,
+        userRole,
+        null,
+        positionName,
+        annualBalance,
+        annualUsed
+      );
+    });
+  }
+}
+
+function sendResponse(
+  res,
+  user,
+  userRole,
+  division,
+  positionName,
+  annualBalance,
+  annualUsed
+) {
+  const token = jwt.sign(
+    { id: user.userId, role: user.roleId },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+
+  const userId = user.userId;
+  const userName = user.name;
+  const currentHour = new Date().getHours();
+  let greeting;
+
+  if (currentHour >= 5 && currentHour < 12) {
+    greeting = "Good Morning 🌞";
+  } else if (currentHour >= 12 && currentHour < 17) {
+    greeting = "Good Afternoon ☀";
+  } else if (currentHour >= 17 && currentHour < 21) {
+    greeting = "Good Evening 🌤";
+  } else {
+    greeting = "Good Night 🌙";
+  }
+
+  // Kirim respons dengan token, userId, userName, userRole, division, positionName, greeting, annualBalance, dan annualUsed
+  res.json({
+    token,
+    userId,
+    userName,
+    userRole,
+    division,
+    positionName, // Kirim positionName dalam respons
+    greeting,
+    annualBalance,
+    annualUsed,
+  });
+}
+
+const resetPassword = (req, res) => {
   const { email, newPassword } = req.body;
 
   // Cek apakah email dan password baru disertakan
@@ -164,4 +242,4 @@ exports.resetPassword = (req, res) => {
   });
 };
 
-module.exports = { loginUser };
+module.exports = { loginUser, resetPassword };

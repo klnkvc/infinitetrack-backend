@@ -14,19 +14,17 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + path.extname(file.originalname)); // Memberi nama unik pada gambar
   },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 1024 * 1024 * 5 }, // Batas ukuran file 5MB
+});
 
 const router = express.Router();
 
 // Route untuk Check-In
-router.post(
-  "/attendance/checkin",
-  verifyToken,
-  upload.single("upload_image"),
-  checkIn
-);
+router.post("/checkin", upload.single("upload_image"), checkIn);
 
 // Route untuk Check-Out
-router.post("/attendance/checkout", verifyToken, checkOut);
+router.post("/checkout", checkOut);
 
 module.exports = router;

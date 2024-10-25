@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const upload = require("../middleware/upload"); // Jika menggunakan middleware untuk upload
+const upload = require("../middleware/upload");
 const {
   handleLeaveRequest,
 } = require("../Controllers/leaveRequest_Controller");

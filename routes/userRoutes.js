@@ -5,11 +5,13 @@ const {
   deleteUser,
   getAllUsers,
   getUserById,
-} = require("../controllers/userController");
+  register,
+} = require("../Controllers/user_Controller");
 
 const router = express.Router();
 
 // Routes
+router.post("/register", register);
 router.post("/users", insertUser);
 router.put("/users/:id", updateUser);
 router.delete("/users/:id", deleteUser);

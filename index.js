@@ -26,28 +26,20 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 // Fungsi untuk mendapatkan ID kategori absensi berdasarkan nama
-const getAttendanceCategoryId = (category) => {
-  return category === "Work From Office" ? 1 : 2; // 1 untuk WFH, 2 untuk WFO
-};
 
-// Fungsi untuk mendapatkan ID status absensi
-const getAttendanceStatusId = (status) => {
-  return status === "late" ? 1 : 2; // 1 untuk Late, 2 untuk Confirm
-};
-
-// Set storage for Multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "./uploads/"); // Menentukan direktori tempat menyimpan file
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    ); // Menentukan nama file
-  },
-});
+// // Set storage for Multer
+// const storage = multer.diskStorage({
+//   destination: function (req, file, cb) {
+//     cb(null, "./uploads/"); // Menentukan direktori tempat menyimpan file
+//   },
+//   filename: function (req, file, cb) {
+//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+//     cb(
+//       null,
+//       file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
+//     ); // Menentukan nama file
+//   },
+// });
 
 // // Set upload middleware
 // const upload = multer({
@@ -60,7 +52,8 @@ app.use("/auth", authRoutes);
 app.use("/attendance", verifyToken, attendanceRoutes);
 app.use("/head-program", verifyToken, headProgramRoutes);
 app.use("/otp", verifyToken, otpRoutes);
-app.use("/users", verifyToken, userRoutes);
+// app.use("/users/register", userRoutes);
+app.use("/users", userRoutes);
 app.use("/leave-request", verifyToken, leaveRequestRoutes);
 
 // Start server
