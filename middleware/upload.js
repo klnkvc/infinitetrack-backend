@@ -8,11 +8,12 @@ const storage = multer.diskStorage({
     cb(null, "./uploads/"); // Menentukan direktori tempat menyimpan file
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    // Menggunakan nama asli file dengan tambahan timestamp untuk menghindari bentrok nama
+    const uniqueSuffix = Date.now();
     cb(
       null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    ); // Menentukan nama file
+      uniqueSuffix + "-" + file.originalname // Menggabungkan timestamp dan nama asli file
+    );
   },
 });
 

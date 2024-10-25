@@ -54,7 +54,7 @@ app.use("/head-program", verifyToken, headProgramRoutes);
 app.use("/otp", verifyToken, otpRoutes);
 // app.use("/users/register", userRoutes);
 app.use("/users", userRoutes);
-app.use("/leave-request", verifyToken, leaveRequestRoutes);
+app.use("/leave", verifyToken, leaveRequestRoutes);
 
 // Start server
 app.listen(port, "0.0.0.0", () => {
