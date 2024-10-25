@@ -1068,17 +1068,23 @@ app.post("/leave-request", upload.single("upload_image"), (req, res) => {
                 return res.status(500).json({ message: "DB Error" });
               }
 
-              updateAnnualUsed(userId, (err) => {
-                if (err) {
-                  return res
-                    .status(500)
-                    .json({ message: "Error updating leave balance" });
-                }
+              if (leavetypeId === 4) {
+                updateAnnualUsed(userId, (err) => {
+                  if (err) {
+                    return res
+                      .status(500)
+                      .json({ message: "Error updating leave balance" });
+                  }
 
-                res.status(201).json({
-                  message:
-                    "Leave request submitted successfully, annual leave balance updated",
+                  res.status(201).json({
+                    message:
+                      "Leave request submitted successfully, annual leave balance updated",
+                  });
                 });
+              }
+
+              res.status(201).json({
+                message: "Leave request submitted successfully",
               });
             }
           );
