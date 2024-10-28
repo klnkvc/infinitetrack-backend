@@ -169,17 +169,43 @@ function sendResponse(
     greeting = "Good Night 🌙";
   }
 
-  // Kirim respons dengan token, userId, userName, userRole, division, positionName, greeting, annualBalance, dan annualUsed
+  // Cek apakah pengguna telah mengisi data tambahan
+  const isProfileComplete =
+    user.phone_number &&
+    user.nip_nim &&
+    user.address &&
+    user.start_contract &&
+    user.end_contract;
+
+  // Pesan jika data belum lengkap
+  let missingFieldsMessage = "";
+  if (!isProfileComplete) {
+    missingFieldsMessage = "Please complete your profile information:";
+    if (!user.phone_number) missingFieldsMessage += " Phone Number,";
+    if (!user.nip_nim) missingFieldsMessage += " NIP/NIM,";
+    if (!user.address) missingFieldsMessage += " Address,";
+    if (!user.start_contract) missingFieldsMessage += " Start Contract Date,";
+    if (!user.end_contract) missingFieldsMessage += " End Contract Date.";
+    missingFieldsMessage = missingFieldsMessage.replace(/,\s*$/, "."); // Hapus koma terakhir
+  }
+
   res.json({
     token,
     userId,
     userName,
     userRole,
     division,
-    positionName, // Kirim positionName dalam respons
+    positionName,
     greeting,
     annualBalance,
     annualUsed,
+    phone_number: user.phone_number || null, // Tambahkan data tambahan
+    nip_nim: user.nip_nim || null,
+    address: user.address || null,
+    start_contract: user.start_contract || null,
+    end_contract: user.end_contract || null,
+    isProfileComplete,
+    message: isProfileComplete ? null : missingFieldsMessage, // Pesan jika data belum lengkap
   });
 }
 

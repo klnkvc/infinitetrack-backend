@@ -223,65 +223,54 @@ const insertUser = async (
   }
 };
 
-// Update User Function
 const updateUser = (req, res) => {
   const userId = parseInt(req.params.id);
-  const { name, email, password, role } = req.body;
+  const { phone_number, nip_nim, address, start_contract, end_contract } =
+    req.body;
 
-  const queryFindRoleId = "SELECT roleId FROM roles WHERE role = ?";
-
-  db.query(queryFindRoleId, [role], (err, roleResult) => {
+  // Cek apakah pengguna ada di database
+  const queryGetUser =
+    "SELECT nip_nim, address, start_contract, end_contract FROM users WHERE userId = ?";
+  db.query(queryGetUser, [userId], (err, userResult) => {
     if (err) {
       return res.status(500).json({ message: "Database error", error: err });
     }
 
-    if (roleResult.length === 0) {
-      return res.status(400).json({ message: "Role not found" });
-    }
+    const existingUserData = userResult[0];
 
-    const roleId = roleResult[0].roleId; // Get roleId from query result
-    let hashedPassword = password;
+    if (
+      existingUserData.nip_nim &&
+      existingUserData.address &&
+      existingUserData.start_contract &&
+      existingUserData.end_contract
+    ) {
+      if (
+        nip_nim !== existingUserData.nip_nim ||
+        address !== existingUserData.address ||
+        start_contract !== existingUserData.start_contract ||
+        end_contract !== existingUserData.end_contract
+      ) {
+        const queryUpdateUser = `UPDATE users SET phone_number = ? WHERE userId = ?`;
 
-    if (password) {
-      bcrypt.genSalt(10, (err, salt) => {
-        if (err) {
-          return res
-            .status(500)
-            .json({ message: "Error generating salt", error: err });
-        }
-
-        bcrypt.hash(password, salt, (err, hash) => {
-          if (err) {
-            return res
-              .status(500)
-              .json({ message: "Error hashing password", error: err });
-          }
-          hashedPassword = hash; // Set the hashed password
-          updateUserInDb();
-        });
-      });
-    } else {
-      updateUserInDb(); // If no password is provided, skip hashing
-    }
-
-    function updateUserInDb() {
-      const queryUpdateUser =
-        "UPDATE users SET name = ?, email = ?, password = ?, roleId = ? , updated_at = NOW() WHERE userId = ?";
-      db.query(
-        queryUpdateUser,
-        [name, email, hashedPassword, roleId, userId],
-        (err, result) => {
+        db.query(queryUpdateUser, [phone_number, userId], (err, result) => {
           if (err) {
             return res
               .status(500)
               .json({ message: "Database error", error: err });
           }
+
           if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "User not found" });
+            return res
+              .status(404)
+              .json({ message: "User not found or no changes made." });
           }
-          res.json({ message: "User updated successfully" });
-        }
-      );
+        });
+
+        return res.status(201).json({
+          message:
+            "You cannot update nip_nim, address, start_contract, or end_contract as they already exist. Phone Number Updated",
+        });
+      }
     }
   });
 };
