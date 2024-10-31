@@ -5,10 +5,6 @@ const {
   handleLeaveRequest,
 } = require("../Controllers/leaveRequest_Controller");
 
-router.post(
-  "/leave-request",
-  upload.single("upload_image"),
-  handleLeaveRequest
-);
+router.post("/users", upload.single("upload_image"), handleLeaveRequest);
 
 module.exports = router;

@@ -305,7 +305,7 @@ const getAllUsers = (req, res) => {
 const getUserById = (req, res) => {
   const id = parseInt(req.params.id);
 
-  const queryGetUserById = "SELECT * FROM users WHERE id = ?";
+  const queryGetUserById = "SELECT * FROM users WHERE userId = ?";
   db.query(queryGetUserById, [id], (err, result) => {
     if (err) {
       return res.status(500).json({ message: "Database error", error: err });
