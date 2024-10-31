@@ -301,11 +301,44 @@ const getAllUsers = (req, res) => {
   });
 };
 
+// // Get User By ID Function
+// const getUserById = (req, res) => {
+//   const id = parseInt(req.params.id);
+
+//   const queryGetUserById = "SELECT * FROM users WHERE userId = ?";
+//   db.query(queryGetUserById, [id], (err, result) => {
+//     if (err) {
+//       return res.status(500).json({ message: "Database error", error: err });
+//     }
+//     if (result.length === 0) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+//     res.json(result[0]);
+//   });
+// };
+
 // Get User By ID Function
 const getUserById = (req, res) => {
   const id = parseInt(req.params.id);
 
-  const queryGetUserById = "SELECT * FROM users WHERE userId = ?";
+  const queryGetUserById = `
+    SELECT 
+      users.name AS name, 
+      users.divisionId AS divisionId, 
+      divisions.division AS division, 
+      head_user.name AS headprogram 
+    FROM 
+      users 
+    LEFT JOIN 
+      divisions ON users.divisionId = divisions.divisionId 
+    LEFT JOIN 
+      head_program ON divisions.programId = head_program.programId 
+    LEFT JOIN 
+      users AS head_user ON head_program.userId = head_user.userId 
+    WHERE 
+      users.userId = ?;
+  `;
+
   db.query(queryGetUserById, [id], (err, result) => {
     if (err) {
       return res.status(500).json({ message: "Database error", error: err });
@@ -313,7 +346,16 @@ const getUserById = (req, res) => {
     if (result.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.json(result[0]);
+
+    // Ambil hasil dan hapus userId dari hasil
+    const user = {
+      name: result[0].name,
+      divisionId: result[0].divisionId,
+      division: result[0].division,
+      headprogram: result[0].headprogram,
+    };
+
+    res.json(user);
   });
 };
 
