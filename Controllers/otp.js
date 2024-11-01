@@ -1,21 +1,19 @@
-// controllers/otp_Controller.js
 const speakeasy = require("speakeasy");
 const sendOTP = require("../utils/nodeMailer");
+const { otpVerifiedCache } = require("../utils/cache.js");
 const { infinite_track_connection: db } = require("../dbconfig.js");
 
 const otpCache = {};
-let otpVerifiedCache = {};
 
-// Fungsi untuk generate OTP menggunakan speakeasy
 function generateOTP() {
   const otp = speakeasy.totp({
-    secret: process.env.OTP_SECRET || "secret_key", // Gunakan kunci rahasia yang aman di production
+    secret: process.env.OTP_SECRET || "secret_key",
     encoding: "base32",
+    step: 180,
   });
   return otp;
 }
 
-// Controller untuk mengirim OTP
 exports.sendOTP = (req, res) => {
   const { email } = req.body;
 
@@ -23,7 +21,6 @@ exports.sendOTP = (req, res) => {
     return res.status(400).json({ error: "Email is required" });
   }
 
-  // Cek apakah user ada di database
   db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
     if (err) {
       console.error("Error checking user:", err.message);
@@ -35,9 +32,8 @@ exports.sendOTP = (req, res) => {
     }
 
     const otp = generateOTP();
-    otpCache[email] = otp;
+    otpCache[email] = otp; // Menyimpan OTP yang dikirim
 
-    // Mengirimkan OTP melalui email
     sendOTP(email, otp)
       .then(() => {
         console.log("OTP sent");
@@ -50,19 +46,21 @@ exports.sendOTP = (req, res) => {
   });
 };
 
-// Controller untuk verifikasi OTP
 exports.verifyOTP = (req, res) => {
   const { email, otp } = req.body;
 
+  // Memverifikasi OTP yang diterima dengan OTP yang dikirim
   const isVerified = speakeasy.totp.verify({
-    secret: process.env.OTP_SECRET || "secret_key", // Kunci rahasia yang aman
+    secret: process.env.OTP_SECRET || "secret_key",
     encoding: "base32",
     token: otp,
-    window: 1, // Jendela waktu verifikasi (disarankan 1)
+    step: 180,
+    window: 1,
   });
 
   if (isVerified) {
-    otpVerifiedCache[email] = true;
+    otpVerifiedCache[email] = true; // Tandai OTP berhasil diverifikasi
+    console.log(`OTP verified for ${email}`);
     return res.status(200).json({ message: "OTP verified" });
   } else {
     return res.status(400).json({ message: "Invalid OTP" });

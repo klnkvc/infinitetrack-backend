@@ -16,6 +16,7 @@ const headProgramRoutes = require("./routes/headProgramRoutes.js");
 const otpRoutes = require("./routes/otpRoutes.js");
 const userRoutes = require("./routes/userRoutes.js");
 const leaveRequestRoutes = require("./routes/leaveRequestRoutes.js");
+const divisionRoutes = require("./routes/divisionRoutes.js");
 
 const app = express();
 const port = 3000;
@@ -52,8 +53,8 @@ app.use("/auth", authRoutes);
 app.use("/attendance", verifyToken, attendanceRoutes);
 app.use("/head-program", headProgramRoutes);
 app.use("/otp", verifyToken, otpRoutes);
-// app.use("/users/register", userRoutes);
 app.use("/users", userRoutes);
+app.use("/divisions", divisionRoutes);
 app.use("/leave", leaveRequestRoutes);
 
 // Start server

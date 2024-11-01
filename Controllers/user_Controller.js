@@ -29,7 +29,6 @@ const register = async (req, res) => {
       isApprover,
     } = req.body;
 
-    // Validasi input wajib
     if (
       !name ||
       !email ||
@@ -44,7 +43,16 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Cek apakah user sudah ada berdasarkan email
+    // Validasi password
+    const passwordRegex =
+      /^(?=.[A-Z])(?=.\d)(?=.[@$!%?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 8 characters long, include an uppercase letter, a number, and a special character.",
+      });
+    }
+
     const existingUser = await queryAsync(
       "SELECT * FROM users WHERE email = ?",
       [email]
@@ -53,7 +61,6 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "User already exists" });
     }
 
-    // Proses role
     let roleResults = await queryAsync("SELECT * FROM roles WHERE role = ?", [
       role,
     ]);
@@ -71,9 +78,7 @@ const register = async (req, res) => {
     let divisionId = null;
     let programId = null;
 
-    // Jika user adalah head program, hanya butuh program
     if (isHeadProgram) {
-      // Proses program
       let programResults = await queryAsync(
         "SELECT * FROM programs WHERE programName = ?",
         [program]
@@ -87,10 +92,7 @@ const register = async (req, res) => {
         );
         programId = programInsertResult.insertId;
       }
-    }
-    // Jika user bukan head program, proses division dan program
-    else if (is_hasDivision && is_hasProgram) {
-      // Proses program
+    } else if (is_hasDivision && is_hasProgram) {
       let programResults = await queryAsync(
         "SELECT * FROM programs WHERE programName = ?",
         [program]
@@ -105,7 +107,6 @@ const register = async (req, res) => {
         programId = programInsertResult.insertId;
       }
 
-      // Proses division
       let divisionResults = await queryAsync(
         "SELECT * FROM divisions WHERE division = ?",
         [division]
@@ -121,7 +122,6 @@ const register = async (req, res) => {
       }
     }
 
-    // Proses position
     let positionResults = await queryAsync(
       "SELECT * FROM positions WHERE positionName = ?",
       [position]
@@ -137,7 +137,6 @@ const register = async (req, res) => {
       positionId = positionInsertResult.insertId;
     }
 
-    // Insert user baru
     await insertUser(
       name,
       email,
@@ -158,7 +157,6 @@ const register = async (req, res) => {
   }
 };
 
-// Fungsi insertUser
 const insertUser = async (
   name,
   email,
@@ -228,103 +226,155 @@ const updateUser = (req, res) => {
   const { phone_number, nip_nim, address, start_contract, end_contract } =
     req.body;
 
-  // Cek apakah pengguna ada di database
+  const profile_photo = req.file ? req.file.path : null;
+
   const queryGetUser = `
-    SELECT nip_nim, address, start_contract, end_contract 
+    SELECT nip_nim, address, start_contract, end_contract, profile_photo
     FROM users 
     WHERE userId = ?
   `;
 
   db.query(queryGetUser, [userId], (err, userResult) => {
     if (err) {
+      console.error("Database error while fetching user:", err);
       return res.status(500).json({ message: "Database error", error: err });
     }
 
     const existingUserData = userResult[0];
-
-    if (
+    const dataIsFullyUpdated =
       existingUserData.nip_nim &&
-      existingUserData.address &&
       existingUserData.start_contract &&
-      existingUserData.end_contract
-    ) {
-      if (
-        nip_nim !== existingUserData.nip_nim ||
-        address !== existingUserData.address ||
-        start_contract !== existingUserData.start_contract ||
-        end_contract !== existingUserData.end_contract
-      ) {
-        // Hitung annual_balance berdasarkan perbedaan start_contract dan end_contract
-        const start = new Date(start_contract);
-        const end = new Date(end_contract);
-        const monthsDifference =
-          (end.getFullYear() - start.getFullYear()) * 12 +
-          (end.getMonth() - start.getMonth());
-        const annual_balance = Math.max(0, monthsDifference); // Jika hasil negatif, set 0
+      existingUserData.end_contract;
 
-        // Update pengguna di database
-        const queryUpdateUser = `
-          UPDATE users 
-          SET phone_number = ?, start_contract = ?, end_contract = ? 
-          WHERE userId = ?
-        `;
-        db.query(
-          queryUpdateUser,
-          [phone_number, start_contract, end_contract, userId],
-          (err, result) => {
-            if (err) {
-              return res
-                .status(500)
-                .json({ message: "Database error", error: err });
-            }
+    const updateUserQuery = (fields, values) => {
+      const setClause = fields.map((field) => `${field} = ?`).join(", ");
+      const query = `UPDATE users SET ${setClause} WHERE userId = ?`;
 
-            // Update leave_balance dengan annual_balance baru
-            const queryUpdateLeaveBalance = `
-            UPDATE leave_balance 
-            SET annual_balance = ? 
-            WHERE userId = ?
-          `;
-            db.query(
-              queryUpdateLeaveBalance,
-              [annual_balance, userId],
-              (err, result) => {
-                if (err) {
-                  return res
-                    .status(500)
-                    .json({ message: "Database error", error: err });
-                }
+      db.query(query, [...values, userId], (err, result) => {
+        if (err) {
+          console.error("Database error while updating user:", err);
+          return res
+            .status(500)
+            .json({ message: "Database error", error: err });
+        }
+        res.status(201).json({ message: "User updated successfully." });
+      });
+    };
 
-                if (result.affectedRows === 0) {
-                  return res
-                    .status(404)
-                    .json({ message: "User not found or no changes made." });
-                }
-
-                res.status(201).json({
-                  message:
-                    "Contract details updated and annual balance recalculated",
-                  annual_balance,
-                });
-              }
-            );
-          }
-        );
-      } else {
-        res.status(201).json({
+    if (dataIsFullyUpdated) {
+      if (nip_nim || start_contract || end_contract) {
+        return res.status(400).json({
           message:
-            "No changes detected in nip_nim, address, start_contract, or end_contract. Only phone number updated.",
+            "nip_nim, start_contract, and end_contract cannot be updated.",
         });
       }
+
+      const fields = [];
+      const values = [];
+
+      if (phone_number) {
+        fields.push("phone_number");
+        values.push(phone_number);
+      }
+
+      if (address) {
+        fields.push("address");
+        values.push(address);
+      }
+
+      if (profile_photo) {
+        fields.push("profile_photo");
+        values.push(profile_photo);
+      }
+
+      if (fields.length === 0) {
+        return res.status(400).json({
+          message: "No fields to update.",
+        });
+      }
+
+      return updateUserQuery(fields, values);
+    }
+
+    if (nip_nim && start_contract && end_contract) {
+      const fields = [
+        "phone_number",
+        "nip_nim",
+        "address",
+        "start_contract",
+        "end_contract",
+      ];
+      const values = [
+        phone_number,
+        nip_nim,
+        address,
+        start_contract,
+        end_contract,
+      ];
+
+      if (profile_photo) {
+        fields.push("profile_photo");
+        values.push(profile_photo);
+      }
+
+      db.query(
+        `UPDATE users SET ${fields
+          .map((f) => `${f} = ?`)
+          .join(", ")} WHERE userId = ?`,
+        [...values, userId],
+        (err, result) => {
+          if (err) {
+            console.error(
+              "Database error while updating contract details:",
+              err
+            );
+            return res
+              .status(500)
+              .json({ message: "Database error", error: err });
+          }
+
+          const start = new Date(start_contract);
+          const end = new Date(end_contract);
+          const monthsDifference =
+            (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth());
+          const annual_balance = Math.max(0, monthsDifference);
+
+          db.query(
+            `UPDATE leave_balance SET annual_balance = ? WHERE userId = ?`,
+            [annual_balance, userId],
+            (err) => {
+              if (err) {
+                console.error(
+                  "Database error while updating leave balance:",
+                  err
+                );
+                return res
+                  .status(500)
+                  .json({ message: "Database error", error: err });
+              }
+              res.status(201).json({
+                message: "Profile updated successfully.",
+                annual_balance,
+              });
+            }
+          );
+        }
+      );
+    } else {
+      res.status(400).json({
+        message:
+          "All contract details (nip_nim, start_contract, end_contract) must be provided.",
+      });
     }
   });
 };
 
-// Delete User Function
 const deleteUser = (req, res) => {
-  const id = parseInt(req.params.id);
+  const userId = parseInt(req.params.id);
 
-  const queryDeleteUser = "DELETE FROM users WHERE id = ?";
-  db.query(queryDeleteUser, [id], (err, result) => {
+  const queryDeleteUser = "DELETE FROM users WHERE userId = ?";
+  db.query(queryDeleteUser, [userId], (err, result) => {
     if (err)
       return res.status(500).json({ message: "Database error", error: err });
     if (result.affectedRows === 0) {
@@ -334,7 +384,6 @@ const deleteUser = (req, res) => {
   });
 };
 
-// Get All Users Function
 const getAllUsers = (req, res) => {
   const queryGetAllUsers = "SELECT * FROM users";
   db.query(queryGetAllUsers, (err, result) => {
@@ -345,23 +394,6 @@ const getAllUsers = (req, res) => {
   });
 };
 
-// // Get User By ID Function
-// const getUserById = (req, res) => {
-//   const id = parseInt(req.params.id);
-
-//   const queryGetUserById = "SELECT * FROM users WHERE userId = ?";
-//   db.query(queryGetUserById, [id], (err, result) => {
-//     if (err) {
-//       return res.status(500).json({ message: "Database error", error: err });
-//     }
-//     if (result.length === 0) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-//     res.json(result[0]);
-//   });
-// };
-
-// Get User By ID Function
 const getUserById = (req, res) => {
   const id = parseInt(req.params.id);
 
@@ -391,7 +423,6 @@ const getUserById = (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Ambil hasil dan hapus userId dari hasil
     const user = {
       name: result[0].name,
       divisionId: result[0].divisionId,
@@ -403,6 +434,92 @@ const getUserById = (req, res) => {
   });
 };
 
+const getAttendanceByUserId = (req, res) => {
+  const id = parseInt(req.params.id);
+
+  const queryGetAttendanceByUserId = `
+    SELECT 
+      a.attendanceId AS attendanceId,
+      a.userId AS userId,
+      a.attendance_date AS attendance_date,
+      a.check_in_time AS check_in_time,
+      a.check_out_time AS check_out_time,
+      a.latitude AS latitude,
+      a.longitude AS longitude,
+      a.upload_image AS upload_image,
+      a.notes AS notes,
+      ac.attendance_category AS attendance_category,
+      s.attendance_status AS attendance_status
+    FROM 
+      attendance a
+    LEFT JOIN 
+      attendance_category ac ON a.attendance_category_id = ac.attendance_category_id
+    LEFT JOIN 
+      attendance_status s ON a.attendance_status_id = s.attendance_status_id
+    WHERE 
+      a.userId = ?;
+  `;
+
+  db.query(queryGetAttendanceByUserId, [id], (err, result) => {
+    if (err) {
+      console.error("Database error:", err.message);
+      return res.status(500).json({ message: "Database error", error: err });
+    }
+    if (result.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "No attendance records found for this user" });
+    }
+
+    const formattedResult = result.map((record) => {
+      const attendanceDate = new Date(record.attendance_date);
+      const checkInTime = record.check_in_time
+        ? new Date(record.check_in_time)
+        : null;
+      const checkOutTime = record.check_out_time
+        ? new Date(record.check_out_time)
+        : null;
+
+      const formattedAttendanceDate = attendanceDate
+        .getDate()
+        .toString()
+        .padStart(2, "0");
+
+      const formattedAttendanceMonthYear = `${attendanceDate.toLocaleString(
+        "en-EN",
+        { month: "short" }
+      )} ${attendanceDate.getFullYear()}`;
+
+      return {
+        attendanceId: record.attendanceId,
+        userId: record.userId,
+        attendance_category: record.attendance_category,
+        attendance_status: record.attendance_status,
+        attendance_date: formattedAttendanceDate,
+        attendance_month_year: formattedAttendanceMonthYear,
+        check_in_time: checkInTime
+          ? checkInTime.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
+        check_out_time: checkOutTime
+          ? checkOutTime.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
+        latitude: record.latitude,
+        longitude: record.longitude,
+        upload_image: record.upload_image,
+        notes: record.notes,
+      };
+    });
+
+    res.json(formattedResult);
+  });
+};
+
 module.exports = {
   register,
   insertUser,
@@ -410,4 +527,5 @@ module.exports = {
   deleteUser,
   getAllUsers,
   getUserById,
+  getAttendanceByUserId,
 };

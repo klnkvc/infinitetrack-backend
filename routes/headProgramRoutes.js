@@ -1,16 +1,13 @@
-// routes/headProgramRoutes.js
 const express = require("express");
 const {
-  createHeadProgram,
   getHeadProgramById,
+  getAllHeadPrograms,
 } = require("../Controllers/headProgram_Controller");
 
 const router = express.Router();
 
-// Rute untuk membuat headprogram baru
-router.post("/headprogram", createHeadProgram);
+router.get("/get", getAllHeadPrograms);
 
-// Rute untuk mendapatkan headprogram berdasarkan ID
-router.get("/:headprogramId", getHeadProgramById);
+router.get("/get/:headprogramId", getHeadProgramById);
 
 module.exports = router;

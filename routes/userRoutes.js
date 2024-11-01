@@ -1,21 +1,21 @@
 const express = require("express");
 const {
-  insertUser,
   updateUser,
   deleteUser,
   getAllUsers,
   getUserById,
   register,
+  getAttendanceByUserId,
 } = require("../Controllers/user_Controller");
 
 const router = express.Router();
+const uploadProfile = require("../middleware/uploadProfile");
 
-// Routes
 router.post("/register", register);
-router.post("/users", insertUser);
-router.put("/:id", updateUser);
+router.put("/:id", uploadProfile.single("profile_photo"), updateUser);
 router.delete("/:id", deleteUser);
-router.get("/users", getAllUsers);
+router.get("/get", getAllUsers);
 router.get("/get/:id", getUserById);
+router.get("/attendance/:id", getAttendanceByUserId);
 
 module.exports = router;
