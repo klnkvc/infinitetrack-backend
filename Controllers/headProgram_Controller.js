@@ -44,19 +44,42 @@ const getHeadProgramById = (req, res) => {
   const headprogramId = req.params.headprogramId;
 
   // Query to fetch headprogram by ID
-  const query = "SELECT * FROM head_program WHERE headprogramId = ?";
-  db.query(query, [headprogramId], (err, result) => {
+  const queryHeadProgram = "SELECT * FROM head_program WHERE headprogramId = ?";
+  db.query(queryHeadProgram, [headprogramId], (err, headProgramResult) => {
     if (err) {
       console.error("Error retrieving headprogram:", err.message);
       return res.status(500).json({ message: "Database Error", error: err });
     }
 
-    if (result.length === 0) {
+    if (headProgramResult.length === 0) {
       return res.status(404).json({ message: "Headprogram not found" });
     }
 
-    // Return the fetched headprogram
-    res.status(200).json(result[0]);
+    const headProgram = headProgramResult[0];
+    const userId = headProgram.userId; // Assuming head_program table contains userId column
+
+    // Query to fetch the name from users table based on userId
+    const queryUserName = "SELECT name FROM users WHERE userId = ?";
+    db.query(queryUserName, [userId], (err, userResult) => {
+      if (err) {
+        console.error("Error retrieving user name:", err.message);
+        return res.status(500).json({ message: "Database Error", error: err });
+      }
+
+      if (userResult.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "User not found for the headprogram" });
+      }
+
+      // Merge user name with headProgram data
+      const response = {
+        headprogramName: userResult[0].name,
+      };
+
+      // Return the merged data
+      res.status(200).json(response);
+    });
   });
 };
 

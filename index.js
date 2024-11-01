@@ -50,7 +50,7 @@ app.use(cookieParser());
 // Routes
 app.use("/auth", authRoutes);
 app.use("/attendance", verifyToken, attendanceRoutes);
-app.use("/head-program", verifyToken, headProgramRoutes);
+app.use("/head-program", headProgramRoutes);
 app.use("/otp", verifyToken, otpRoutes);
 // app.use("/users/register", userRoutes);
 app.use("/users", userRoutes);

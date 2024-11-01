@@ -11,6 +11,6 @@ const router = express.Router();
 router.post("/headprogram", createHeadProgram);
 
 // Rute untuk mendapatkan headprogram berdasarkan ID
-router.get("/headprogram/:headprogramId", getHeadProgramById);
+router.get("/:headprogramId", getHeadProgramById);
 
 module.exports = router;
