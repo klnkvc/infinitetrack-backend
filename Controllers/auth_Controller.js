@@ -1,4 +1,3 @@
-// controllers/auth_Controller.js
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { infinite_track_connection: db } = require("../dbconfig.js");
@@ -24,7 +23,6 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid password" });
     }
 
-    // Ambil role berdasarkan roleId dari pengguna
     const queryFindRole = "SELECT * FROM roles WHERE roleId = ?";
     db.query(queryFindRole, [user.roleId], (err, roleResult) => {
       if (err) {
@@ -37,8 +35,7 @@ const loginUser = async (req, res) => {
 
       const userRole = roleResult[0].role;
 
-      // Ambil position berdasarkan positionId dari pengguna
-      let positionName = null; // Default jika tidak ada posisi
+      let positionName = null;
       if (user.positionId) {
         const queryFindPosition =
           "SELECT positionName FROM positions WHERE positionId = ?";
@@ -53,15 +50,13 @@ const loginUser = async (req, res) => {
             }
 
             if (positionResult.length > 0) {
-              positionName = positionResult[0].positionName; // Ambil nama posisi jika ditemukan
+              positionName = positionResult[0].positionName;
             }
 
-            // Lanjutkan dengan pencarian division dan leave balance
             handleDivisionAndLeaveBalance(user, userRole, positionName, res);
           }
         );
       } else {
-        // Jika user tidak memiliki positionId, langsung lanjut ke pencarian division dan leave balance
         handleDivisionAndLeaveBalance(user, userRole, positionName, res);
       }
     });
@@ -76,67 +71,118 @@ function handleDivisionAndLeaveBalance(user, userRole, positionName, res) {
         return res.status(500).json({ message: "Database error", error: err });
       }
 
-      // Cek jika user tidak memiliki divisi
       const division =
         divisionResult.length > 0 ? divisionResult[0].division : null;
 
-      // Ambil annual_balance dan annual_used dari leave_balance berdasarkan userId
-      const queryFindLeaveBalance =
-        "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
-      db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
-        if (err) {
-          return res
-            .status(500)
-            .json({ message: "Database error", error: err });
-        }
+      const programId =
+        divisionResult.length > 0 ? divisionResult[0].programId : null;
 
-        let annualBalance = 0;
-        let annualUsed = 0;
+      if (programId) {
+        const queryFindHeadProgram =
+          "SELECT headprogramId FROM head_program WHERE programId = ?";
+        db.query(
+          queryFindHeadProgram,
+          [programId],
+          (err, headProgramResult) => {
+            if (err) {
+              return res
+                .status(500)
+                .json({ message: "Database error", error: err });
+            }
 
-        if (balanceResult.length > 0) {
-          annualBalance = balanceResult[0].annual_balance;
-          annualUsed = balanceResult[0].annual_used;
-        }
+            const headprogramId =
+              headProgramResult.length > 0
+                ? headProgramResult[0].headprogramId
+                : null;
 
-        sendResponse(
-          res,
+            const queryFindLeaveBalance =
+              "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+            db.query(
+              queryFindLeaveBalance,
+              [user.userId],
+              (err, balanceResult) => {
+                if (err) {
+                  return res
+                    .status(500)
+                    .json({ message: "Database error", error: err });
+                }
+
+                let annualBalance = 0;
+                let annualUsed = 0;
+
+                if (balanceResult.length > 0) {
+                  annualBalance = balanceResult[0].annual_balance;
+                  annualUsed = balanceResult[0].annual_used;
+                }
+
+                sendResponse(
+                  res,
+                  user,
+                  userRole,
+                  division,
+                  positionName,
+                  annualBalance,
+                  annualUsed,
+                  headprogramId
+                );
+              }
+            );
+          }
+        );
+      } else {
+        handleLeaveBalanceWithoutHeadProgram(
           user,
           userRole,
-          division,
           positionName,
-          annualBalance,
-          annualUsed
+          division,
+          res
         );
-      });
+      }
     });
   } else {
-    // Jika user tidak memiliki divisionId
-    const queryFindLeaveBalance =
-      "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
-    db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
-      if (err) {
-        return res.status(500).json({ message: "Database error", error: err });
-      }
-
-      let annualBalance = 0;
-      let annualUsed = 0;
-
-      if (balanceResult.length > 0) {
-        annualBalance = balanceResult[0].annual_balance;
-        annualUsed = balanceResult[0].annual_used;
-      }
-
-      sendResponse(
-        res,
-        user,
-        userRole,
-        null,
-        positionName,
-        annualBalance,
-        annualUsed
-      );
-    });
+    handleLeaveBalanceWithoutHeadProgram(
+      user,
+      userRole,
+      positionName,
+      null,
+      res
+    );
   }
+}
+
+function handleLeaveBalanceWithoutHeadProgram(
+  user,
+  userRole,
+  positionName,
+  division,
+  res
+) {
+  const queryFindLeaveBalance =
+    "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+  db.query(queryFindLeaveBalance, [user.userId], (err, balanceResult) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error", error: err });
+    }
+
+    let annualBalance = 0;
+    let annualUsed = 0;
+
+    if (balanceResult.length > 0) {
+      annualBalance = balanceResult[0].annual_balance;
+      annualUsed = balanceResult[0].annual_used;
+    }
+
+    sendResponse(
+      res,
+      user,
+      userRole,
+      division,
+      positionName,
+      annualBalance,
+      annualUsed,
+      null
+    );
+  });
 }
 
 function sendResponse(
@@ -146,7 +192,8 @@ function sendResponse(
   division,
   positionName,
   annualBalance,
-  annualUsed
+  annualUsed,
+  headprogramId
 ) {
   const token = jwt.sign(
     { id: user.userId, role: user.roleId },
@@ -169,7 +216,6 @@ function sendResponse(
     greeting = "Good Night 🌙";
   }
 
-  // Cek apakah pengguna telah mengisi data tambahan
   const isProfileComplete =
     user.phone_number &&
     user.nip_nim &&
@@ -177,7 +223,6 @@ function sendResponse(
     user.start_contract &&
     user.end_contract;
 
-  // Pesan jika data belum lengkap
   let missingFieldsMessage = "";
   if (!isProfileComplete) {
     missingFieldsMessage = "Please complete your profile information:";
@@ -186,7 +231,7 @@ function sendResponse(
     if (!user.address) missingFieldsMessage += " Address,";
     if (!user.start_contract) missingFieldsMessage += " Start Contract Date,";
     if (!user.end_contract) missingFieldsMessage += " End Contract Date.";
-    missingFieldsMessage = missingFieldsMessage.replace(/,\s*$/, "."); // Hapus koma terakhir
+    missingFieldsMessage = missingFieldsMessage.replace(/,\s*$/, ".");
   }
 
   res.json({
@@ -199,27 +244,26 @@ function sendResponse(
     greeting,
     annualBalance,
     annualUsed,
-    phone_number: user.phone_number || null, // Tambahkan data tambahan
+    headprogramId,
+    phone_number: user.phone_number || null,
     nip_nim: user.nip_nim || null,
     address: user.address || null,
     start_contract: user.start_contract || null,
     end_contract: user.end_contract || null,
     isProfileComplete,
-    message: isProfileComplete ? null : missingFieldsMessage, // Pesan jika data belum lengkap
+    message: isProfileComplete ? null : missingFieldsMessage,
   });
 }
 
 const resetPassword = (req, res) => {
   const { email, newPassword } = req.body;
 
-  // Cek apakah email dan password baru disertakan
   if (!email || !newPassword) {
     return res
       .status(400)
       .json({ message: "Email and new password are required" });
   }
 
-  // Cek apakah email ada di database
   db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
     if (err) {
       console.error("Error checking user:", err.message);
@@ -230,20 +274,17 @@ const resetPassword = (req, res) => {
       return res.status(400).json({ message: "User not registered" });
     }
 
-    // Cek apakah OTP sudah diverifikasi
     if (!otpVerifiedCache.hasOwnProperty(email)) {
       return res
         .status(400)
         .json({ message: "OTP not verified for this email" });
     }
 
-    // Hash password baru
     bcrypt.genSalt(10, (err, salt) => {
       if (err) throw err;
       bcrypt.hash(newPassword, salt, (err, hashedPassword) => {
         if (err) throw err;
 
-        // Update password di database
         const queryUpdatePassword =
           "UPDATE users SET password = ? WHERE email = ?";
         db.query(
@@ -257,7 +298,6 @@ const resetPassword = (req, res) => {
                 .json({ message: "Failed to reset password" });
             }
 
-            // Hapus status verifikasi OTP setelah password berhasil direset
             delete otpVerifiedCache[email];
 
             res.status(200).json({ message: "Password successfully reset" });

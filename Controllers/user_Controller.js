@@ -229,8 +229,12 @@ const updateUser = (req, res) => {
     req.body;
 
   // Cek apakah pengguna ada di database
-  const queryGetUser =
-    "SELECT nip_nim, address, start_contract, end_contract FROM users WHERE userId = ?";
+  const queryGetUser = `
+    SELECT nip_nim, address, start_contract, end_contract 
+    FROM users 
+    WHERE userId = ?
+  `;
+
   db.query(queryGetUser, [userId], (err, userResult) => {
     if (err) {
       return res.status(500).json({ message: "Database error", error: err });
@@ -250,25 +254,65 @@ const updateUser = (req, res) => {
         start_contract !== existingUserData.start_contract ||
         end_contract !== existingUserData.end_contract
       ) {
-        const queryUpdateUser = `UPDATE users SET phone_number = ? WHERE userId = ?`;
+        // Hitung annual_balance berdasarkan perbedaan start_contract dan end_contract
+        const start = new Date(start_contract);
+        const end = new Date(end_contract);
+        const monthsDifference =
+          (end.getFullYear() - start.getFullYear()) * 12 +
+          (end.getMonth() - start.getMonth());
+        const annual_balance = Math.max(0, monthsDifference); // Jika hasil negatif, set 0
 
-        db.query(queryUpdateUser, [phone_number, userId], (err, result) => {
-          if (err) {
-            return res
-              .status(500)
-              .json({ message: "Database error", error: err });
+        // Update pengguna di database
+        const queryUpdateUser = `
+          UPDATE users 
+          SET phone_number = ?, start_contract = ?, end_contract = ? 
+          WHERE userId = ?
+        `;
+        db.query(
+          queryUpdateUser,
+          [phone_number, start_contract, end_contract, userId],
+          (err, result) => {
+            if (err) {
+              return res
+                .status(500)
+                .json({ message: "Database error", error: err });
+            }
+
+            // Update leave_balance dengan annual_balance baru
+            const queryUpdateLeaveBalance = `
+            UPDATE leave_balance 
+            SET annual_balance = ? 
+            WHERE userId = ?
+          `;
+            db.query(
+              queryUpdateLeaveBalance,
+              [annual_balance, userId],
+              (err, result) => {
+                if (err) {
+                  return res
+                    .status(500)
+                    .json({ message: "Database error", error: err });
+                }
+
+                if (result.affectedRows === 0) {
+                  return res
+                    .status(404)
+                    .json({ message: "User not found or no changes made." });
+                }
+
+                res.status(201).json({
+                  message:
+                    "Contract details updated and annual balance recalculated",
+                  annual_balance,
+                });
+              }
+            );
           }
-
-          if (result.affectedRows === 0) {
-            return res
-              .status(404)
-              .json({ message: "User not found or no changes made." });
-          }
-        });
-
-        return res.status(201).json({
+        );
+      } else {
+        res.status(201).json({
           message:
-            "You cannot update nip_nim, address, start_contract, or end_contract as they already exist. Phone Number Updated",
+            "No changes detected in nip_nim, address, start_contract, or end_contract. Only phone number updated.",
         });
       }
     }
