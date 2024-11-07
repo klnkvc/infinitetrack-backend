@@ -8,7 +8,6 @@ const multer = require("multer");
 const path = require("path");
 require("dotenv").config();
 
-// Import routes
 const { verifyToken, checkRole } = require("./middleware/authMiddleWare.js");
 const attendanceRoutes = require("./routes/attendanceRoutes.js");
 const authRoutes = require("./routes/authRoutes.js");
@@ -21,7 +20,6 @@ const divisionRoutes = require("./routes/divisionRoutes.js");
 const app = express();
 const port = 3000;
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 app.use(cookieParser());
@@ -48,7 +46,6 @@ app.use(cookieParser());
 //   limits: { fileSize: 1024 * 1024 * 5 }, // Batas ukuran file 5MB
 // });
 
-// Routes
 app.use("/auth", authRoutes);
 app.use("/attendance", verifyToken, attendanceRoutes);
 app.use("/head-program", headProgramRoutes);
@@ -57,7 +54,6 @@ app.use("/users", userRoutes);
 app.use("/divisions", divisionRoutes);
 app.use("/leave", leaveRequestRoutes);
 
-// Start server
 app.listen(port, "0.0.0.0", () => {
   console.log(`Server running at http://localhost:${port}`);
 });

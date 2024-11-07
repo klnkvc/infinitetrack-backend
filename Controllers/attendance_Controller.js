@@ -2,22 +2,20 @@ const { infinite_track_connection: db } = require("../dbconfig");
 const { haversineDistance } = require("../utils/geofence");
 
 const getAttendanceCategoryId = (category) => {
-  return category === "Work From Office" ? 1 : 2; // 1 untuk WFO, 2 untuk WFH
+  return category === "Work From Office" ? 1 : 2;
 };
 
-// Fungsi untuk mendapatkan ID status absensi
 const getAttendanceStatusId = (status) => {
-  return status === "late" ? 1 : 2; // 1 untuk Late, 2 untuk Confirm
+  return status === "late" ? 1 : 2;
 };
 
-// lokasi kantor
 const officeLocation = {
   latitude: 1.1853258302684722,
   longitude: 104.10194910214162,
 };
 
 const handleAttendance = (req, res) => {
-  const { attendance_category, action } = req.body;
+  const { attendance_category, action, notes } = req.body;
   let { latitude, longitude } = req.body;
   const attendance_category_id = getAttendanceCategoryId(attendance_category);
   const userId = req.user.id;
@@ -28,9 +26,7 @@ const handleAttendance = (req, res) => {
   let attendance_status_id;
 
   if (action === "checkin") {
-    // Handle Check-In Logic
     if (attendance_category_id === 2) {
-      // Validasi untuk Work From Home (WFO)
       if (!req.file) {
         return res
           .status(400)
@@ -40,8 +36,7 @@ const handleAttendance = (req, res) => {
       latitude = null;
       longitude = null;
     } else {
-      // Validasi geofence (radius dalam meter)
-      const allowedRadius = 125; // 125 meter
+      const allowedRadius = 125;
       const userLocation = {
         latitude: parseFloat(latitude),
         longitude: parseFloat(longitude),
@@ -56,10 +51,9 @@ const handleAttendance = (req, res) => {
       upload_image = "";
     }
 
-    attendance_status_id = currentHour < 9 ? 1 : 2; // Check for lateness
-
+    attendance_status_id = currentHour < 9 ? 1 : 2;
     db.query(
-      "INSERT INTO attendance (check_in_time, check_out_time, userId, attendance_category_id, attendance_status_id, attendance_date, latitude, longitude, upload_image) VALUES (NOW(), NULL, ?, ?, ?, CURDATE(), ?, ?, ?)",
+      "INSERT INTO attendance (check_in_time, check_out_time, userId, attendance_category_id, attendance_status_id, attendance_date, latitude, longitude, upload_image, notes) VALUES (NOW(), NULL, ?, ?, ?, CURDATE(), ?, ?, ?, ?)",
       [
         userId,
         attendance_category_id,
@@ -67,6 +61,7 @@ const handleAttendance = (req, res) => {
         latitude,
         longitude,
         upload_image,
+        notes,
       ],
       (err, result) => {
         if (err) {
@@ -107,8 +102,7 @@ const handleAttendance = (req, res) => {
       }
     );
   } else if (action === "checkout") {
-    // Handle Check-Out Logic
-    attendance_status_id = currentHour > 17 ? 3 : 1; // 3 untuk overtime, 1 untuk normal
+    attendance_status_id = currentHour > 17 ? 3 : 1;
 
     db.query(
       "UPDATE attendance SET check_out_time = NOW(), attendance_status_id = ? WHERE userId = ? AND attendance_date = CURDATE() AND check_out_time IS NULL",

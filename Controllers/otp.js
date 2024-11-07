@@ -1,15 +1,14 @@
 const speakeasy = require("speakeasy");
 const sendOTP = require("../utils/nodeMailer");
-const { otpVerifiedCache } = require("../utils/cache.js");
 const { infinite_track_connection: db } = require("../dbconfig.js");
 
 const otpCache = {};
+let otpVerifiedCache = {};
 
 function generateOTP() {
   const otp = speakeasy.totp({
     secret: process.env.OTP_SECRET || "secret_key",
     encoding: "base32",
-    step: 180,
   });
   return otp;
 }
@@ -32,7 +31,7 @@ exports.sendOTP = (req, res) => {
     }
 
     const otp = generateOTP();
-    otpCache[email] = otp; // Menyimpan OTP yang dikirim
+    otpCache[email] = otp;
 
     sendOTP(email, otp)
       .then(() => {
@@ -49,18 +48,15 @@ exports.sendOTP = (req, res) => {
 exports.verifyOTP = (req, res) => {
   const { email, otp } = req.body;
 
-  // Memverifikasi OTP yang diterima dengan OTP yang dikirim
   const isVerified = speakeasy.totp.verify({
     secret: process.env.OTP_SECRET || "secret_key",
     encoding: "base32",
     token: otp,
-    step: 180,
     window: 1,
   });
 
   if (isVerified) {
-    otpVerifiedCache[email] = true; // Tandai OTP berhasil diverifikasi
-    console.log(`OTP verified for ${email}`);
+    otpVerifiedCache[email] = true;
     return res.status(200).json({ message: "OTP verified" });
   } else {
     return res.status(400).json({ message: "Invalid OTP" });

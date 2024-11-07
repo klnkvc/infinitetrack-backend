@@ -1,10 +1,8 @@
 const jwt = require("jsonwebtoken");
 const { infinite_track_connection: db } = require("../dbconfig.js");
 
-// Middleware untuk memverifikasi token
-
 const verifyToken = (req, res, next) => {
-  const token = req.header("Authorization")?.split(" ")[1]; // Ambil token dari header
+  const token = req.header("Authorization")?.split(" ")[1];
   if (!token) {
     return res
       .status(401)
@@ -13,7 +11,7 @@ const verifyToken = (req, res, next) => {
 
   try {
     const verified = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = verified; // Menyimpan data user dari token (termasuk roleId)
+    req.user = verified;
 
     const queryFindRole = "SELECT * FROM roles WHERE roleId = ?";
     db.query(queryFindRole, [req.user.role], (err, result) => {
@@ -25,7 +23,7 @@ const verifyToken = (req, res, next) => {
         return res.status(400).json({ message: "Role not found" });
       }
 
-      req.user.roleName = result[0].role; // Ambil nama role dan simpan sebagai roleName
+      req.user.roleName = result[0].role;
 
       next();
     });
@@ -35,7 +33,6 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-// Middleware untuk mengecek role
 const checkRole = (roles) => (req, res, next) => {
   if (!roles.includes(req.user.roleName)) {
     return res.status(403).json({ message: "Access Forbidden" });

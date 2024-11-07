@@ -43,16 +43,6 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // Validasi password
-    const passwordRegex =
-      /^(?=.[A-Z])(?=.\d)(?=.[@$!%?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(password)) {
-      return res.status(400).json({
-        message:
-          "Password must be at least 8 characters long, include an uppercase letter, a number, and a special character.",
-      });
-    }
-
     const existingUser = await queryAsync(
       "SELECT * FROM users WHERE email = ?",
       [email]
@@ -226,155 +216,98 @@ const updateUser = (req, res) => {
   const { phone_number, nip_nim, address, start_contract, end_contract } =
     req.body;
 
-  const profile_photo = req.file ? req.file.path : null;
-
   const queryGetUser = `
-    SELECT nip_nim, address, start_contract, end_contract, profile_photo
+    SELECT nip_nim, address, start_contract, end_contract 
     FROM users 
     WHERE userId = ?
   `;
 
   db.query(queryGetUser, [userId], (err, userResult) => {
     if (err) {
-      console.error("Database error while fetching user:", err);
       return res.status(500).json({ message: "Database error", error: err });
     }
 
     const existingUserData = userResult[0];
-    const dataIsFullyUpdated =
+
+    if (
       existingUserData.nip_nim &&
+      existingUserData.address &&
       existingUserData.start_contract &&
-      existingUserData.end_contract;
+      existingUserData.end_contract
+    ) {
+      if (
+        nip_nim !== existingUserData.nip_nim ||
+        address !== existingUserData.address ||
+        start_contract !== existingUserData.start_contract ||
+        end_contract !== existingUserData.end_contract
+      ) {
+        const start = new Date(start_contract);
+        const end = new Date(end_contract);
+        const monthsDifference =
+          (end.getFullYear() - start.getFullYear()) * 12 +
+          (end.getMonth() - start.getMonth());
+        const annual_balance = Math.max(0, monthsDifference);
 
-    const updateUserQuery = (fields, values) => {
-      const setClause = fields.map((field) => `${field} = ?`).join(", ");
-      const query = `UPDATE users SET ${setClause} WHERE userId = ?`;
-
-      db.query(query, [...values, userId], (err, result) => {
-        if (err) {
-          console.error("Database error while updating user:", err);
-          return res
-            .status(500)
-            .json({ message: "Database error", error: err });
-        }
-        res.status(201).json({ message: "User updated successfully." });
-      });
-    };
-
-    if (dataIsFullyUpdated) {
-      if (nip_nim || start_contract || end_contract) {
-        return res.status(400).json({
-          message:
-            "nip_nim, start_contract, and end_contract cannot be updated.",
-        });
-      }
-
-      const fields = [];
-      const values = [];
-
-      if (phone_number) {
-        fields.push("phone_number");
-        values.push(phone_number);
-      }
-
-      if (address) {
-        fields.push("address");
-        values.push(address);
-      }
-
-      if (profile_photo) {
-        fields.push("profile_photo");
-        values.push(profile_photo);
-      }
-
-      if (fields.length === 0) {
-        return res.status(400).json({
-          message: "No fields to update.",
-        });
-      }
-
-      return updateUserQuery(fields, values);
-    }
-
-    if (nip_nim && start_contract && end_contract) {
-      const fields = [
-        "phone_number",
-        "nip_nim",
-        "address",
-        "start_contract",
-        "end_contract",
-      ];
-      const values = [
-        phone_number,
-        nip_nim,
-        address,
-        start_contract,
-        end_contract,
-      ];
-
-      if (profile_photo) {
-        fields.push("profile_photo");
-        values.push(profile_photo);
-      }
-
-      db.query(
-        `UPDATE users SET ${fields
-          .map((f) => `${f} = ?`)
-          .join(", ")} WHERE userId = ?`,
-        [...values, userId],
-        (err, result) => {
-          if (err) {
-            console.error(
-              "Database error while updating contract details:",
-              err
-            );
-            return res
-              .status(500)
-              .json({ message: "Database error", error: err });
-          }
-
-          const start = new Date(start_contract);
-          const end = new Date(end_contract);
-          const monthsDifference =
-            (end.getFullYear() - start.getFullYear()) * 12 +
-            (end.getMonth() - start.getMonth());
-          const annual_balance = Math.max(0, monthsDifference);
-
-          db.query(
-            `UPDATE leave_balance SET annual_balance = ? WHERE userId = ?`,
-            [annual_balance, userId],
-            (err) => {
-              if (err) {
-                console.error(
-                  "Database error while updating leave balance:",
-                  err
-                );
-                return res
-                  .status(500)
-                  .json({ message: "Database error", error: err });
-              }
-              res.status(201).json({
-                message: "Profile updated successfully.",
-                annual_balance,
-              });
+        const queryUpdateUser = `
+          UPDATE users 
+          SET phone_number = ?, start_contract = ?, end_contract = ? 
+          WHERE userId = ?
+        `;
+        db.query(
+          queryUpdateUser,
+          [phone_number, start_contract, end_contract, userId],
+          (err, result) => {
+            if (err) {
+              return res
+                .status(500)
+                .json({ message: "Database error", error: err });
             }
-          );
-        }
-      );
-    } else {
-      res.status(400).json({
-        message:
-          "All contract details (nip_nim, start_contract, end_contract) must be provided.",
-      });
+
+            const queryUpdateLeaveBalance = `
+            UPDATE leave_balance 
+            SET annual_balance = ? 
+            WHERE userId = ?
+          `;
+            db.query(
+              queryUpdateLeaveBalance,
+              [annual_balance, userId],
+              (err, result) => {
+                if (err) {
+                  return res
+                    .status(500)
+                    .json({ message: "Database error", error: err });
+                }
+
+                if (result.affectedRows === 0) {
+                  return res
+                    .status(404)
+                    .json({ message: "User not found or no changes made." });
+                }
+
+                res.status(201).json({
+                  message:
+                    "Contract details updated and annual balance recalculated",
+                  annual_balance,
+                });
+              }
+            );
+          }
+        );
+      } else {
+        res.status(201).json({
+          message:
+            "No changes detected in nip_nim, address, start_contract, or end_contract. Only phone number updated.",
+        });
+      }
     }
   });
 };
 
 const deleteUser = (req, res) => {
-  const userId = parseInt(req.params.id);
+  const id = parseInt(req.params.id);
 
-  const queryDeleteUser = "DELETE FROM users WHERE userId = ?";
-  db.query(queryDeleteUser, [userId], (err, result) => {
+  const queryDeleteUser = "DELETE FROM users WHERE id = ?";
+  db.query(queryDeleteUser, [id], (err, result) => {
     if (err)
       return res.status(500).json({ message: "Database error", error: err });
     if (result.affectedRows === 0) {
@@ -439,30 +372,24 @@ const getAttendanceByUserId = (req, res) => {
 
   const queryGetAttendanceByUserId = `
     SELECT 
-      a.attendanceId AS attendanceId,
-      a.userId AS userId,
-      a.attendance_date AS attendance_date,
-      a.check_in_time AS check_in_time,
-      a.check_out_time AS check_out_time,
-      a.latitude AS latitude,
-      a.longitude AS longitude,
-      a.upload_image AS upload_image,
-      a.notes AS notes,
-      ac.attendance_category AS attendance_category,
-      s.attendance_status AS attendance_status
+      attendanceId AS attendanceId,
+      userId AS userId,
+      attendance_category_id AS attendance_category_id,
+      attendance_status_id AS attendance_status_id,
+      check_in_time AS check_in_time,
+      check_out_time AS check_out_time,
+      attendance_date AS attendance_date,
+      latitude AS longitude,
+      upload_image AS upload_image,
+      notes AS notes
     FROM 
-      attendance a
-    LEFT JOIN 
-      attendance_category ac ON a.attendance_category_id = ac.attendance_category_id
-    LEFT JOIN 
-      attendance_status s ON a.attendance_status_id = s.attendance_status_id
+      attendance
     WHERE 
-      a.userId = ?;
+      attendance.userId = ?;
   `;
 
   db.query(queryGetAttendanceByUserId, [id], (err, result) => {
     if (err) {
-      console.error("Database error:", err.message);
       return res.status(500).json({ message: "Database error", error: err });
     }
     if (result.length === 0) {
@@ -471,52 +398,7 @@ const getAttendanceByUserId = (req, res) => {
         .json({ message: "No attendance records found for this user" });
     }
 
-    const formattedResult = result.map((record) => {
-      const attendanceDate = new Date(record.attendance_date);
-      const checkInTime = record.check_in_time
-        ? new Date(record.check_in_time)
-        : null;
-      const checkOutTime = record.check_out_time
-        ? new Date(record.check_out_time)
-        : null;
-
-      const formattedAttendanceDate = attendanceDate
-        .getDate()
-        .toString()
-        .padStart(2, "0");
-
-      const formattedAttendanceMonthYear = `${attendanceDate.toLocaleString(
-        "en-EN",
-        { month: "short" }
-      )} ${attendanceDate.getFullYear()}`;
-
-      return {
-        attendanceId: record.attendanceId,
-        userId: record.userId,
-        attendance_category: record.attendance_category,
-        attendance_status: record.attendance_status,
-        attendance_date: formattedAttendanceDate,
-        attendance_month_year: formattedAttendanceMonthYear,
-        check_in_time: checkInTime
-          ? checkInTime.toLocaleTimeString("id-ID", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : null,
-        check_out_time: checkOutTime
-          ? checkOutTime.toLocaleTimeString("id-ID", {
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : null,
-        latitude: record.latitude,
-        longitude: record.longitude,
-        upload_image: record.upload_image,
-        notes: record.notes,
-      };
-    });
-
-    res.json(formattedResult);
+    res.json(result);
   });
 };
 

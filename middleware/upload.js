@@ -1,29 +1,25 @@
-// middleware/upload.js
 const multer = require("multer");
 const path = require("path");
 
-// Set storage for Multer
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "./uploads/"); // Menentukan direktori tempat menyimpan file
+    cb(null, "./uploads/");
   },
   filename: function (req, file, cb) {
-    // Menggunakan nama asli file dengan tambahan tanggal untuk menghindari bentrok nama
     const currentDate = new Date();
     const formattedDate = currentDate
       .toISOString()
       .slice(0, 10)
-      .replace(/-/g, ""); // Format: YYYYMMDD
-    const originalName = file.originalname.replace(/\s+/g, "_"); // Mengganti spasi dengan underscore jika ada
+      .replace(/-/g, "");
+    const originalName = file.originalname.replace(/\s+/g, "_");
 
-    cb(null, `${formattedDate}-${originalName}`); // Menggabungkan tanggal dan nama asli file
+    cb(null, `${formattedDate}-${originalName}`);
   },
 });
 
-// Set upload middleware
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 1024 * 1024 * 5 }, // Batas ukuran file 5MB
+  limits: { fileSize: 1024 * 1024 * 5 },
 });
 
-module.exports = upload; // Ekspor middleware upload
+module.exports = upload;
