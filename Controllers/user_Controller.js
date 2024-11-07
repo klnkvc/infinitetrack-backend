@@ -376,9 +376,9 @@ const getAttendanceByUserId = (req, res) => {
       userId AS userId,
       attendance_category_id AS attendance_category_id,
       attendance_status_id AS attendance_status_id,
+      attendance_date AS attendance_date,
       check_in_time AS check_in_time,
       check_out_time AS check_out_time,
-      attendance_date AS attendance_date,
       latitude AS longitude,
       upload_image AS upload_image,
       notes AS notes
@@ -398,7 +398,31 @@ const getAttendanceByUserId = (req, res) => {
         .json({ message: "No attendance records found for this user" });
     }
 
-    res.json(result);
+    const formattedResult = result.map((record) => {
+      const attendanceDate = new Date(record.attendance_date);
+      const checkInTime = new Date(record.check_in_time);
+      const checkOutTime = new Date(record.check_out_time);
+
+      const formattedAttendanceDate = `${attendanceDate.getDate()} ${attendanceDate.toLocaleString(
+        "id-ID",
+        { month: "long" }
+      )} ${attendanceDate.getFullYear()}`;
+
+      return {
+        ...record,
+        attendance_date: formattedAttendanceDate,
+        check_in_time: checkInTime.toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        check_out_time: checkOutTime.toLocaleTimeString("id-ID", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+      };
+    });
+
+    res.json(formattedResult);
   });
 };
 
