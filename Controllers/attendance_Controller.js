@@ -127,6 +127,55 @@ const handleAttendance = (req, res) => {
   }
 };
 
+const uploadImage = (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "Image file is required" });
+  }
+
+  const upload_image = req.file.path;
+  const userId = req.user.id;
+
+  db.query(
+    "INSERT INTO user_images (userId, upload_image, upload_date) VALUES (?, ?, NOW())",
+    [userId, upload_image],
+    (err, result) => {
+      if (err) {
+        console.error("Error uploading image:", err.message);
+        return res.status(500).json({ message: "Failed to upload image" });
+      }
+
+      res
+        .status(200)
+        .json({ message: "Image uploaded successfully", upload_image });
+    }
+  );
+};
+
+const uploadImageNoAuth = (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ message: "Image file is required" });
+  }
+
+  const upload_image = req.file.path;
+
+  db.query(
+    "INSERT INTO images (upload_image, upload_date) VALUES (?, NOW())",
+    [upload_image],
+    (err, result) => {
+      if (err) {
+        console.error("Error uploading image:", err.message);
+        return res.status(500).json({ message: "Failed to upload image" });
+      }
+
+      res
+        .status(200)
+        .json({ message: "Image uploaded successfully", upload_image });
+    }
+  );
+};
+
 module.exports = {
   handleAttendance,
+  uploadImage,
+  uploadImageNoAuth,
 };
