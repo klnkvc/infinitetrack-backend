@@ -7,6 +7,9 @@ const {
   approveByHeadProgram,
   approveByOperational,
   approveByProgramDirector,
+  getAssignedLeaveRequests,
+  getDeclinedLeaveRequests,
+  getApprovedLeaveRequests,
 } = require("../Controllers/leave_Controller");
 
 router.post("/users", upload.single("upload_image"), handleLeaveRequest);
@@ -17,5 +20,8 @@ router.post(
   approveByProgramDirector
 );
 router.get("/history", getAllLeaveUsers);
+router.get("/users/:role/assigned", getAssignedLeaveRequests);
+router.get("/users/:role/declined", getDeclinedLeaveRequests);
+router.get("/users/:role/approved", getApprovedLeaveRequests);
 
 module.exports = router;

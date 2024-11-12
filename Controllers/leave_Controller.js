@@ -380,9 +380,8 @@ function getAllLeaveUsers(req, res) {
 
 function approveByHeadProgram(req, res) {
   const { leaveId } = req.params;
-  const { approvalStatus } = req.body; // approvalStatus akan berupa "approved" atau "declined"
+  const { approvalStatus } = req.body;
 
-  // Cek apakah approvalStatus adalah "approved" atau "declined"
   if (approvalStatus === "approved") {
     const query = `
       UPDATE leave_users 
@@ -438,7 +437,6 @@ function approveByHeadProgram(req, res) {
         .json({ message: "Leave request declined by HeadProgram" });
     });
   } else {
-    // Jika approvalStatus tidak valid
     res.status(400).json({
       message: "Invalid approval status. Must be 'approved' or 'declined'.",
     });
@@ -447,7 +445,7 @@ function approveByHeadProgram(req, res) {
 
 function approveByOperational(req, res) {
   const { leaveId } = req.params;
-  const { approvalStatus } = req.body; // "approved" atau "declined"
+  const { approvalStatus } = req.body;
 
   if (approvalStatus === "approved") {
     const query = `
@@ -502,7 +500,6 @@ function approveByOperational(req, res) {
         .json({ message: "Leave request declined by Operational" });
     });
   } else {
-    // Jika approvalStatus tidak valid
     res.status(400).json({
       message: "Invalid approval status. Must be 'approved' or 'declined'.",
     });
@@ -511,7 +508,7 @@ function approveByOperational(req, res) {
 
 function approveByProgramDirector(req, res) {
   const { leaveId } = req.params;
-  const { approvalStatus } = req.body; // "approved" atau "declined"
+  const { approvalStatus } = req.body;
 
   if (approvalStatus === "approved") {
     const query = `
@@ -564,11 +561,119 @@ function approveByProgramDirector(req, res) {
         .json({ message: "Leave request declined by Program Director" });
     });
   } else {
-    // Jika approvalStatus tidak valid
     res.status(400).json({
       message: "Invalid approval status. Must be 'approved' or 'declined'.",
     });
   }
+}
+
+function getAssignedLeaveRequests(req, res) {
+  const { role } = req.params;
+
+  let statusId;
+  switch (role.toLowerCase()) {
+    case "headprogram":
+      statusId = 1;
+      break;
+    case "operational":
+      statusId = 2;
+      break;
+    case "programdirector":
+      statusId = 3;
+      break;
+    default:
+      return res.status(400).json({ message: "Invalid role" });
+  }
+
+  const query = `
+    SELECT * FROM leave_users
+    WHERE leavestatusId = ?
+  `;
+
+  db.query(query, [statusId], (err, results) => {
+    if (err) {
+      console.error("Error fetching assigned leave requests:", err.message);
+      return res
+        .status(500)
+        .json({ message: "Error fetching assigned leave requests" });
+    }
+
+    if (results.length === 0) {
+      return res.status(200).json({ message: "empty" });
+    }
+
+    res.status(200).json(results);
+  });
+}
+
+function getDeclinedLeaveRequests(req, res) {
+  const { role } = req.params;
+
+  const validRoles = ["headprogram", "operational", "programdirector"];
+  if (!validRoles.includes(role.toLowerCase())) {
+    return res.status(400).json({ message: "Invalid role" });
+  }
+
+  const statusId = 5;
+
+  const query = `
+    SELECT * FROM leave_users
+    WHERE leavestatusId = ?
+  `;
+
+  db.query(query, [statusId], (err, results) => {
+    if (err) {
+      console.error("Error fetching declined leave requests:", err.message);
+      return res
+        .status(500)
+        .json({ message: "Error fetching declined leave requests" });
+    }
+
+    if (results.length === 0) {
+      return res.status(200).json({ message: "empty" });
+    }
+
+    res.status(200).json(results);
+  });
+}
+
+function getApprovedLeaveRequests(req, res) {
+  const { role } = req.params;
+
+  let statusId;
+  switch (role) {
+    case "headprogram":
+      statusId = 2;
+      break;
+    case "operational":
+      statusId = 3;
+      break;
+    case "programdirector":
+      statusId = 4;
+      break;
+    default:
+      return res.status(400).json({ message: "Invalid role" });
+  }
+
+  const query = `
+    SELECT * FROM leave_users
+    WHERE leavestatusId = ?
+  `;
+
+  db.query(query, [statusId], (err, results) => {
+    if (err) {
+      console.error("Error fetching approved leave requests:", err.message);
+      return res
+        .status(500)
+        .json({ message: "Error fetching approved leave requests" });
+    }
+
+    if (results.length === 0) {
+      return res.status(200).json({ message: "empty" });
+    }
+
+    res.status(200).json(results);
+  });
 }
 
 module.exports = {
@@ -577,4 +682,7 @@ module.exports = {
   approveByHeadProgram,
   approveByOperational,
   approveByProgramDirector,
+  getAssignedLeaveRequests,
+  getDeclinedLeaveRequests,
+  getApprovedLeaveRequests,
 };
