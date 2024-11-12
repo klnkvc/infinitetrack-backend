@@ -14,7 +14,7 @@ const authRoutes = require("./routes/authRoutes.js");
 const headProgramRoutes = require("./routes/headProgramRoutes.js");
 const otpRoutes = require("./routes/otpRoutes.js");
 const userRoutes = require("./routes/userRoutes.js");
-const leaveRequestRoutes = require("./routes/leaveRequestRoutes.js");
+const leaveRoutes = require("./routes/leaveRoutes.js");
 const divisionRoutes = require("./routes/divisionRoutes.js");
 
 const app = express();
@@ -52,7 +52,7 @@ app.use("/head-program", headProgramRoutes);
 app.use("/otp", verifyToken, otpRoutes);
 app.use("/users", userRoutes);
 app.use("/divisions", divisionRoutes);
-app.use("/leave", leaveRequestRoutes);
+app.use("/leave", leaveRoutes);
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`Server running at http://localhost:${port}`);
