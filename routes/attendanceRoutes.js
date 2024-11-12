@@ -4,6 +4,7 @@ const {
   uploadImage,
   uploadImageNoAuth,
 } = require("../Controllers/attendance_Controller");
+const { verifyToken } = require("../middleware/authMiddleWare");
 const multer = require("multer");
 
 const storage = multer.diskStorage({
