@@ -1,8 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { otpVerifiedCache } = require("../utils/cache.js");
 const { infinite_track_connection: db } = require("../dbconfig.js");
-
-let otpVerifiedCache = {};
 
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
@@ -258,12 +257,19 @@ function sendResponse(
 const resetPassword = (req, res) => {
   const { email, newPassword } = req.body;
 
+  // Pastikan email dan password baru ada di dalam request body
   if (!email || !newPassword) {
     return res
       .status(400)
       .json({ message: "Email and new password are required" });
   }
 
+  // Cek apakah OTP telah diverifikasi untuk email ini
+  if (!otpVerifiedCache[email]) {
+    return res.status(400).json({ message: "OTP not verified for this email" });
+  }
+
+  // Ambil user dari database berdasarkan email
   db.query("SELECT * FROM users WHERE email = ?", [email], (err, results) => {
     if (err) {
       console.error("Error checking user:", err.message);
@@ -274,17 +280,15 @@ const resetPassword = (req, res) => {
       return res.status(400).json({ message: "User not registered" });
     }
 
-    if (!otpVerifiedCache.hasOwnProperty(email)) {
-      return res
-        .status(400)
-        .json({ message: "OTP not verified for this email" });
-    }
+    const user = results[0];
 
+    // Hash password baru
     bcrypt.genSalt(10, (err, salt) => {
       if (err) throw err;
       bcrypt.hash(newPassword, salt, (err, hashedPassword) => {
         if (err) throw err;
 
+        // Update password di database
         const queryUpdatePassword =
           "UPDATE users SET password = ? WHERE email = ?";
         db.query(
@@ -298,6 +302,7 @@ const resetPassword = (req, res) => {
                 .json({ message: "Failed to reset password" });
             }
 
+            // Setelah berhasil, hapus cache OTP
             delete otpVerifiedCache[email];
 
             res.status(200).json({ message: "Password successfully reset" });
