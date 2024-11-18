@@ -229,33 +229,56 @@ const updateUser = (req, res) => {
 
     const existingUserData = userResult[0];
 
-    if (
+    const dataIsFullyUpdated =
       existingUserData.nip_nim &&
-      existingUserData.address &&
       existingUserData.start_contract &&
-      existingUserData.end_contract
-    ) {
-      if (
-        nip_nim !== existingUserData.nip_nim ||
-        address !== existingUserData.address ||
-        start_contract !== existingUserData.start_contract ||
-        end_contract !== existingUserData.end_contract
-      ) {
-        const start = new Date(start_contract);
-        const end = new Date(end_contract);
-        const monthsDifference =
-          (end.getFullYear() - start.getFullYear()) * 12 +
-          (end.getMonth() - start.getMonth());
-        const annual_balance = Math.max(0, monthsDifference);
+      existingUserData.end_contract;
 
+    if (dataIsFullyUpdated) {
+      if (nip_nim || start_contract || end_contract) {
+        return res.status(400).json({
+          message:
+            "nip_nim, start_contract, and end_contract cannot be updated.",
+        });
+      }
+
+      const queryUpdateUser = `
+        UPDATE users 
+        SET phone_number = ?, address = ?
+        WHERE userId = ?
+      `;
+      db.query(
+        queryUpdateUser,
+        [phone_number, address, userId],
+        (err, result) => {
+          if (err) {
+            return res
+              .status(500)
+              .json({ message: "Database error", error: err });
+          }
+
+          res.status(201).json({
+            message: "Phone number and address updated successfully.",
+          });
+        }
+      );
+    } else {
+      if (nip_nim && start_contract && end_contract) {
         const queryUpdateUser = `
           UPDATE users 
-          SET phone_number = ?, start_contract = ?, end_contract = ? 
+          SET phone_number = ?, nip_nim = ?, address = ?, start_contract = ?, end_contract = ?
           WHERE userId = ?
         `;
         db.query(
           queryUpdateUser,
-          [phone_number, start_contract, end_contract, userId],
+          [
+            phone_number,
+            nip_nim,
+            address,
+            start_contract,
+            end_contract,
+            userId,
+          ],
           (err, result) => {
             if (err) {
               return res
@@ -263,11 +286,18 @@ const updateUser = (req, res) => {
                 .json({ message: "Database error", error: err });
             }
 
+            const start = new Date(start_contract);
+            const end = new Date(end_contract);
+            const monthsDifference =
+              (end.getFullYear() - start.getFullYear()) * 12 +
+              (end.getMonth() - start.getMonth());
+            const annual_balance = Math.max(0, monthsDifference);
+
             const queryUpdateLeaveBalance = `
-            UPDATE leave_balance 
-            SET annual_balance = ? 
-            WHERE userId = ?
-          `;
+              UPDATE leave_balance 
+              SET annual_balance = ? 
+              WHERE userId = ?
+            `;
             db.query(
               queryUpdateLeaveBalance,
               [annual_balance, userId],
@@ -278,15 +308,8 @@ const updateUser = (req, res) => {
                     .json({ message: "Database error", error: err });
                 }
 
-                if (result.affectedRows === 0) {
-                  return res
-                    .status(404)
-                    .json({ message: "User not found or no changes made." });
-                }
-
                 res.status(201).json({
-                  message:
-                    "Contract details updated and annual balance recalculated",
+                  message: "Profile updated successfully.",
                   annual_balance,
                 });
               }
@@ -294,9 +317,9 @@ const updateUser = (req, res) => {
           }
         );
       } else {
-        res.status(201).json({
+        res.status(400).json({
           message:
-            "No changes detected in nip_nim, address, start_contract, or end_contract. Only phone number updated.",
+            "All contract details (nip_nim, start_contract, end_contract) must be provided.",
         });
       }
     }

@@ -9,6 +9,7 @@ function generateOTP() {
   const otp = speakeasy.totp({
     secret: process.env.OTP_SECRET || "secret_key",
     encoding: "base32",
+    step: 180,
   });
   return otp;
 }
@@ -53,6 +54,7 @@ exports.verifyOTP = (req, res) => {
     secret: process.env.OTP_SECRET || "secret_key",
     encoding: "base32",
     token: otp,
+    step: 180,
     window: 1,
   });
 

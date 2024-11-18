@@ -49,7 +49,7 @@ app.use(cookieParser());
 app.use("/auth", authRoutes);
 app.use("/attendance", verifyToken, attendanceRoutes);
 app.use("/head-program", headProgramRoutes);
-app.use("/otp", verifyToken, otpRoutes);
+app.use("/otp", otpRoutes);
 app.use("/users", userRoutes);
 app.use("/divisions", divisionRoutes);
 app.use("/leave", leaveRoutes);
