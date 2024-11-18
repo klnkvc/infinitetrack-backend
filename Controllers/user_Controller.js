@@ -327,10 +327,10 @@ const updateUser = (req, res) => {
 };
 
 const deleteUser = (req, res) => {
-  const id = parseInt(req.params.id);
+  const userId = parseInt(req.params.id);
 
-  const queryDeleteUser = "DELETE FROM users WHERE id = ?";
-  db.query(queryDeleteUser, [id], (err, result) => {
+  const queryDeleteUser = "DELETE FROM users WHERE userId = ?";
+  db.query(queryDeleteUser, [userId], (err, result) => {
     if (err)
       return res.status(500).json({ message: "Database error", error: err });
     if (result.affectedRows === 0) {
