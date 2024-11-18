@@ -16,25 +16,6 @@ const insertHeadProgram = (headprogram) => {
   });
 };
 
-const createHeadProgram = async (req, res) => {
-  const { headprogram } = req.body;
-
-  if (!headprogram) {
-    return res.status(400).json({ message: "Headprogram Input is required" });
-  }
-
-  try {
-    const headprogramId = await insertHeadProgram(headprogram);
-    res.status(201).json({
-      message: "Headprogram created successfully",
-      headprogramId,
-      headprogram,
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Database Error", error: err });
-  }
-};
-
 const getAllHeadPrograms = (req, res) => {
   const queryHeadPrograms = "SELECT * FROM head_program";
 
@@ -135,4 +116,4 @@ const getHeadProgramById = (req, res) => {
   });
 };
 
-module.exports = { createHeadProgram, getHeadProgramById, getAllHeadPrograms };
+module.exports = { getHeadProgramById, getAllHeadPrograms };
