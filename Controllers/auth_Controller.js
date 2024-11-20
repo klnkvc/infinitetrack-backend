@@ -52,17 +52,29 @@ const loginUser = async (req, res) => {
               positionName = positionResult[0].positionName;
             }
 
-            handleDivisionAndLeaveBalance(user, userRole, positionName, res);
+            handleDivisionAndLeaveBalance(
+              user,
+              userRole,
+              positionName,
+              res,
+              email
+            );
           }
         );
       } else {
-        handleDivisionAndLeaveBalance(user, userRole, positionName, res);
+        handleDivisionAndLeaveBalance(user, userRole, positionName, res, email);
       }
     });
   });
 };
 
-function handleDivisionAndLeaveBalance(user, userRole, positionName, res) {
+function handleDivisionAndLeaveBalance(
+  user,
+  userRole,
+  positionName,
+  res,
+  email
+) {
   if (user.divisionId) {
     const queryFindDivision = "SELECT * FROM divisions WHERE divisionId = ?";
     db.query(queryFindDivision, [user.divisionId], (err, divisionResult) => {
@@ -115,6 +127,7 @@ function handleDivisionAndLeaveBalance(user, userRole, positionName, res) {
                 }
 
                 sendResponse(
+                  email,
                   res,
                   user,
                   userRole,
@@ -130,6 +143,7 @@ function handleDivisionAndLeaveBalance(user, userRole, positionName, res) {
         );
       } else {
         handleLeaveBalanceWithoutHeadProgram(
+          email,
           user,
           userRole,
           positionName,
@@ -140,6 +154,7 @@ function handleDivisionAndLeaveBalance(user, userRole, positionName, res) {
     });
   } else {
     handleLeaveBalanceWithoutHeadProgram(
+      email,
       user,
       userRole,
       positionName,
@@ -150,6 +165,7 @@ function handleDivisionAndLeaveBalance(user, userRole, positionName, res) {
 }
 
 function handleLeaveBalanceWithoutHeadProgram(
+  email,
   user,
   userRole,
   positionName,
@@ -172,6 +188,7 @@ function handleLeaveBalanceWithoutHeadProgram(
     }
 
     sendResponse(
+      email,
       res,
       user,
       userRole,
@@ -185,6 +202,7 @@ function handleLeaveBalanceWithoutHeadProgram(
 }
 
 function sendResponse(
+  email,
   res,
   user,
   userRole,
@@ -234,6 +252,7 @@ function sendResponse(
   }
 
   res.json({
+    email,
     token,
     userId,
     userName,

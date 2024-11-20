@@ -372,24 +372,30 @@ const getAttendanceByUserId = (req, res) => {
 
   const queryGetAttendanceByUserId = `
     SELECT 
-      attendanceId AS attendanceId,
-      userId AS userId,
-      attendance_category_id AS attendance_category_id,
-      attendance_status_id AS attendance_status_id,
-      attendance_date AS attendance_date,
-      check_in_time AS check_in_time,
-      check_out_time AS check_out_time,
-      latitude AS longitude,
-      upload_image AS upload_image,
-      notes AS notes
+      a.attendanceId AS attendanceId,
+      a.userId AS userId,
+      a.attendance_date AS attendance_date,
+      a.check_in_time AS check_in_time,
+      a.check_out_time AS check_out_time,
+      a.latitude AS latitude,
+      a.longitude AS longitude,
+      a.upload_image AS upload_image,
+      a.notes AS notes,
+      ac.attendance_category AS attendance_category,
+      s.attendance_status AS attendance_status
     FROM 
-      attendance
+      attendance a
+    LEFT JOIN 
+      attendance_category ac ON a.attendance_category_id = ac.attendance_category_id
+    LEFT JOIN 
+      attendance_status s ON a.attendance_status_id = s.attendance_status_id
     WHERE 
-      attendance.userId = ?;
+      a.userId = ?;
   `;
 
   db.query(queryGetAttendanceByUserId, [id], (err, result) => {
     if (err) {
+      console.error("Database error:", err.message);
       return res.status(500).json({ message: "Database error", error: err });
     }
     if (result.length === 0) {
@@ -400,8 +406,12 @@ const getAttendanceByUserId = (req, res) => {
 
     const formattedResult = result.map((record) => {
       const attendanceDate = new Date(record.attendance_date);
-      const checkInTime = new Date(record.check_in_time);
-      const checkOutTime = new Date(record.check_out_time);
+      const checkInTime = record.check_in_time
+        ? new Date(record.check_in_time)
+        : null;
+      const checkOutTime = record.check_out_time
+        ? new Date(record.check_out_time)
+        : null;
 
       const formattedAttendanceDate = `${attendanceDate.getDate()} ${attendanceDate.toLocaleString(
         "id-ID",
@@ -409,16 +419,27 @@ const getAttendanceByUserId = (req, res) => {
       )} ${attendanceDate.getFullYear()}`;
 
       return {
-        ...record,
+        attendanceId: record.attendanceId,
+        userId: record.userId,
+        attendance_category: record.attendance_category,
+        attendance_status: record.attendance_status,
         attendance_date: formattedAttendanceDate,
-        check_in_time: checkInTime.toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        check_out_time: checkOutTime.toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+        check_in_time: checkInTime
+          ? checkInTime.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
+        check_out_time: checkOutTime
+          ? checkOutTime.toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          : null,
+        latitude: record.latitude,
+        longitude: record.longitude,
+        upload_image: record.upload_image,
+        notes: record.notes,
       };
     });
 

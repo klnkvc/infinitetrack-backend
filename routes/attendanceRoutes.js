@@ -1,9 +1,5 @@
 const express = require("express");
-const {
-  handleAttendance,
-  uploadImage,
-  uploadImageNoAuth,
-} = require("../Controllers/attendance_Controller");
+const { handleAttendance } = require("../Controllers/attendance_Controller");
 const { verifyToken } = require("../middleware/authMiddleWare");
 const multer = require("multer");
 
@@ -30,19 +26,6 @@ router.post(
   verifyToken,
   upload.single("upload_image"),
   handleAttendance
-);
-
-router.post(
-  "/users/upload-image",
-  verifyToken,
-  upload.single("upload_image"),
-  uploadImage
-);
-
-router.post(
-  "/users/upload-image-noauth",
-  upload.single("upload_image"),
-  uploadImageNoAuth
 );
 
 module.exports = router;

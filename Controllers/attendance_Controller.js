@@ -26,6 +26,11 @@ const handleAttendance = (req, res) => {
   const currentHour = now.getHours();
   let attendance_status_id;
 
+  console.log(
+    "File path (upload_image):",
+    req.file ? req.file.path : "No file"
+  );
+
   if (action === "checkin") {
     if (attendance_category_id === 2) {
       if (!req.file) {
@@ -124,38 +129,12 @@ const handleAttendance = (req, res) => {
       }
     );
   } else {
-    res.status(400).json({ message: "Invalid action" });
+    res
+      .status(400)
+      .json({ message: "Invalid action. Should be checkin or checkout" });
   }
-};
-
-const uploadImage = (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: "Image file is required" });
-  }
-
-  const upload_image = req.file.path;
-
-  res.status(200).json({
-    message: "Image uploaded successfully",
-    upload_image,
-  });
-};
-
-const uploadImageNoAuth = (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: "Image file is required" });
-  }
-
-  const upload_image = req.file.path;
-
-  res.status(200).json({
-    message: "Image uploaded successfully",
-    upload_image,
-  });
 };
 
 module.exports = {
   handleAttendance,
-  uploadImage,
-  uploadImageNoAuth,
 };
