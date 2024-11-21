@@ -43,6 +43,16 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "All fields are required" });
     }
 
+    // Validasi password
+    const passwordRegex =
+      /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 8 characters long, include an uppercase letter, a number, and a special character.",
+      });
+    }
+
     const existingUser = await queryAsync(
       "SELECT * FROM users WHERE email = ?",
       [email]

@@ -16,6 +16,7 @@ const otpRoutes = require("./routes/otpRoutes.js");
 const userRoutes = require("./routes/userRoutes.js");
 const leaveRoutes = require("./routes/leaveRoutes.js");
 const divisionRoutes = require("./routes/divisionRoutes.js");
+const contactRoutes = require("./routes/contactRoutes.js");
 
 const app = express();
 const port = 3000;
@@ -53,6 +54,7 @@ app.use("/otp", otpRoutes);
 app.use("/users", userRoutes);
 app.use("/divisions", divisionRoutes);
 app.use("/leave", leaveRoutes);
+app.use("/contacts", contactRoutes);
 
 app.listen(port, "0.0.0.0", () => {
   console.log(`Server running at http://localhost:${port}`);
