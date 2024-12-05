@@ -39,8 +39,8 @@ const handleAttendance = (req, res) => {
           .json({ message: "Image is required for Work From Home" });
       }
       upload_image = req.file.path;
-      latitude = null;
-      longitude = null;
+      latitude = parseFloat(latitude);
+      longitude = parseFloat(longitude);
     } else {
       const allowedRadius = 125;
       const userLocation = {
