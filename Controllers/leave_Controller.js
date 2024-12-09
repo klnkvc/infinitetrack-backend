@@ -37,6 +37,44 @@ function getProgramIdByProgramName(programName, callback) {
   });
 }
 
+function getProgramAndHeadProgramIdByHeadProgramName(
+  headProgramName,
+  callback
+) {
+  const query = `
+    SELECT 
+      hp.headprogramId,
+      hp.programId
+    FROM 
+      users u
+    INNER JOIN 
+      head_program hp ON u.userId = hp.userId
+    WHERE 
+      u.name = ?;
+  `;
+
+  db.query(query, [headProgramName], (err, result) => {
+    if (err) {
+      console.error(
+        "Error fetching program and head program IDs:",
+        err.message
+      );
+      return callback(err, null);
+    }
+
+    if (result.length === 0) {
+      return callback(
+        new Error("No matching head program or program found"),
+        null
+      );
+    }
+
+    const { programId, headprogramId } = result[0];
+    callback(null, { programId, headprogramId });
+    console.log("Query result:", result);
+  });
+}
+
 function getHeadProgramIdByProgramId(programId, callback) {
   const query =
     "SELECT headprogramId FROM head_program WHERE programId = ? LIMIT 1";
@@ -141,7 +179,7 @@ function updateAnnualUsed(userId, startDate, endDate, callback) {
 function handleLeaveRequest(req, res) {
   const {
     name,
-    programName,
+    headProgramName,
     division,
     start_date,
     end_date,
@@ -155,7 +193,7 @@ function handleLeaveRequest(req, res) {
 
   if (
     !name ||
-    !programName ||
+    !headProgramName ||
     !division ||
     !start_date ||
     !end_date ||
@@ -185,17 +223,9 @@ function handleLeaveRequest(req, res) {
       return res.status(500).json({ message: err.message });
     }
 
-    getProgramIdByProgramName(programName, (err, programId) => {
-      if (err) {
-        if (upload_image) {
-          fs.unlink(req.file.path, (err) => {
-            if (err) console.error("Error deleting the file:", err);
-          });
-        }
-        return res.status(500).json({ message: err.message });
-      }
-
-      getDivisionIdByDivision(division, (err, divisionId) => {
+    getProgramAndHeadProgramIdByHeadProgramName(
+      headProgramName,
+      (err, programAndHeadProgram) => {
         if (err) {
           if (upload_image) {
             fs.unlink(req.file.path, (err) => {
@@ -205,7 +235,9 @@ function handleLeaveRequest(req, res) {
           return res.status(500).json({ message: err.message });
         }
 
-        getLeavetypeIdByLeaveType(leavetype, (err, leavetypeId) => {
+        const { programId, headprogramId } = programAndHeadProgram;
+
+        getDivisionIdByDivision(division, (err, divisionId) => {
           if (err) {
             if (upload_image) {
               fs.unlink(req.file.path, (err) => {
@@ -215,39 +247,18 @@ function handleLeaveRequest(req, res) {
             return res.status(500).json({ message: err.message });
           }
 
-          if (leavetypeId === 4) {
-            checkAnnualUsage(userId, (err, leaveBalance) => {
-              if (err) {
-                if (upload_image) {
-                  fs.unlink(req.file.path, (err) => {
-                    if (err) console.error("Error deleting the file:", err);
-                  });
-                }
-                return res
-                  .status(500)
-                  .json({ message: "Error checking leave balance" });
-              }
-
-              const { annual_used, annual_balance } = leaveBalance;
-              const start = new Date(start_date);
-              const end = new Date(end_date);
-              const diffTime = Math.abs(end - start);
-              const daysRequested =
-                Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-              if (annual_used + daysRequested > annual_balance) {
-                if (upload_image) {
-                  fs.unlink(req.file.path, (err) => {
-                    if (err) console.error("Error deleting the file:", err);
-                  });
-                }
-                return res.status(400).json({
-                  message:
-                    "You Have Reached Your Annual Limit. Leave Rejected. Please Wait for New Annual Leave :D",
+          getLeavetypeIdByLeaveType(leavetype, (err, leavetypeId) => {
+            if (err) {
+              if (upload_image) {
+                fs.unlink(req.file.path, (err) => {
+                  if (err) console.error("Error deleting the file:", err);
                 });
               }
+              return res.status(500).json({ message: err.message });
+            }
 
-              updateAnnualUsed(userId, start_date, end_date, (err) => {
+            if (leavetypeId === 4) {
+              checkAnnualUsage(userId, (err, leaveBalance) => {
                 if (err) {
                   if (upload_image) {
                     fs.unlink(req.file.path, (err) => {
@@ -256,103 +267,164 @@ function handleLeaveRequest(req, res) {
                   }
                   return res
                     .status(500)
-                    .json({ message: "Error updating leave balance" });
+                    .json({ message: "Error checking leave balance" });
                 }
 
-                insertLeaveRequest(
-                  {
-                    userId,
-                    programId,
-                    divisionId,
-                    start_date,
-                    end_date,
-                    leavetypeId,
-                    description,
-                    phone,
-                    address,
-                    upload_image,
-                  },
-                  (err, result) => {
-                    if (err) {
-                      return res.status(500).json({ message: "DB Error" });
-                    }
+                const { annual_used, annual_balance } = leaveBalance;
+                const start = new Date(start_date);
+                const end = new Date(end_date);
+                const diffTime = Math.abs(end - start);
+                const daysRequested =
+                  Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-                    return res.status(201).json({
-                      message:
-                        "Leave request submitted successfully, annual leave balance updated",
+                if (annual_used + daysRequested > annual_balance) {
+                  if (upload_image) {
+                    fs.unlink(req.file.path, (err) => {
+                      if (err) console.error("Error deleting the file:", err);
                     });
                   }
-                );
-              });
-            });
-          } else {
-            insertLeaveRequest(
-              {
-                userId,
-                programId,
-                divisionId,
-                start_date,
-                end_date,
-                leavetypeId,
-                description,
-                phone,
-                address,
-                upload_image,
-              },
-              (err, result) => {
-                if (err) {
-                  return res.status(500).json({ message: "DB Error" });
+                  return res.status(400).json({
+                    message:
+                      "You Have Reached Your Annual Limit. Leave Rejected. Please Wait for New Annual Leave :D",
+                  });
                 }
 
-                res.status(201).json({
-                  message: "Leave request submitted successfully",
+                updateAnnualUsed(userId, start_date, end_date, (err) => {
+                  if (err) {
+                    if (upload_image) {
+                      fs.unlink(req.file.path, (err) => {
+                        if (err) console.error("Error deleting the file:", err);
+                      });
+                    }
+                    return res
+                      .status(500)
+                      .json({ message: "Error updating leave balance" });
+                  }
+
+                  insertLeaveRequest(
+                    {
+                      userId,
+                      headprogramId,
+                      divisionId,
+                      start_date,
+                      end_date,
+                      leavetypeId,
+                      description,
+                      phone,
+                      address,
+                      upload_image,
+                    },
+                    (err, result) => {
+                      if (err) {
+                        return res.status(500).json({ message: "DB Error" });
+                      }
+
+                      return res.status(201).json({
+                        message:
+                          "Leave request submitted successfully, annual leave balance updated",
+                      });
+                    }
+                  );
                 });
-              }
-            );
-          }
+              });
+            } else {
+              insertLeaveRequest(
+                {
+                  userId,
+                  headprogramId,
+                  divisionId,
+                  start_date,
+                  end_date,
+                  leavetypeId,
+                  description,
+                  phone,
+                  address,
+                  upload_image,
+                },
+                (err, result) => {
+                  if (err) {
+                    return res.status(500).json({ message: "DB Error" });
+                  }
+
+                  res.status(201).json({
+                    message: "Leave request submitted successfully",
+                  });
+                }
+              );
+            }
+          });
         });
-      });
-    });
+      }
+    );
   });
 }
 
 function insertLeaveRequest(data, callback) {
   const leavestatusId = data.leavestatusId || 1;
 
-  getHeadProgramIdByProgramId(data.programId, (err, headprogramId) => {
-    if (err) {
-      return res.status(500).json({ message: err.message });
-    }
+  // getHeadProgramIdByProgramId(data.programId, (err, headprogramId) => {
+  //   if (err) {
+  //     return res.status(500).json({ message: err.message });
+  //   }
 
-    const query = `INSERT INTO leave_users 
+  //   const query = `INSERT INTO leave_users
+  //   (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId)
+  //   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+  //   db.query(
+  //     query,
+  //     [
+  //       data.userId,
+  //       headprogramId,
+  //       data.divisionId,
+  //       data.start_date,
+  //       data.end_date,
+  //       data.leavetypeId,
+  //       data.description,
+  //       data.phone,
+  //       data.address,
+  //       data.upload_image,
+  //       leavestatusId,
+  //     ],
+  //     (err, result) => {
+  //       if (err) {
+  //         console.error("Error inserting leave request:", err.message);
+  //         return callback(err, null);
+  //       }
+
+  //       callback(null, result);
+  //     }
+  //   );
+  // });
+
+  const query = `INSERT INTO leave_users 
     (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-    db.query(
-      query,
-      [
-        data.userId,
-        headprogramId,
-        data.divisionId,
-        data.start_date,
-        data.end_date,
-        data.leavetypeId,
-        data.description,
-        data.phone,
-        data.address,
-        data.upload_image,
-        leavestatusId,
-      ],
-      (err, result) => {
-        if (err) {
-          console.error("Error inserting leave request:", err.message);
-          return callback(err, null);
-        }
-
-        callback(null, result);
+  db.query(
+    query,
+    [
+      data.userId,
+      data.headprogramId,
+      data.divisionId,
+      data.start_date,
+      data.end_date,
+      data.leavetypeId,
+      data.description,
+      data.phone,
+      data.address,
+      data.upload_image,
+      leavestatusId,
+    ],
+    (err, result) => {
+      if (err) {
+        console.error("Error inserting leave request:", err.message);
+        return callback(err, null);
       }
-    );
-  });
+
+      callback(null, result);
+    }
+  );
 }
 
 function getAllLeaveUsers(req, res) {
