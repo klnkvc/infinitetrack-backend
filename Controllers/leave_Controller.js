@@ -744,7 +744,7 @@ function getApprovedLeaveRequests(req, res) {
     LEFT JOIN users a ON lu.approverId = a.userId
     LEFT JOIN users hp ON lu.headprogramId = hp.userId
     LEFT JOIN divisions d ON lu.divisionId = d.divisionId
-    LEFT JOIN leave_types lt ON lu.leavetypeId = lt.leaveTypeId
+    LEFT JOIN leave_type lt ON lu.leavetypeId = lt.leaveTypeId
     LEFT JOIN leave_status ls ON lu.leavestatusId = ls.leaveStatusId
     WHERE lu.leavestatusId = ?
   `;
