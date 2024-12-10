@@ -106,39 +106,92 @@ function handleDivisionAndLeaveBalance(
                 ? headProgramResult[0].headprogramId
                 : null;
 
-            const queryFindLeaveBalance =
-              "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
-            db.query(
-              queryFindLeaveBalance,
-              [user.userId],
-              (err, balanceResult) => {
-                if (err) {
-                  return res
-                    .status(500)
-                    .json({ message: "Database error", error: err });
+            if (headprogramId) {
+              const queryFindUserId =
+                "SELECT userId FROM head_program WHERE headprogramId = ?";
+              db.query(
+                queryFindUserId,
+                [headprogramId],
+                (err, userIdResult) => {
+                  if (err) {
+                    return res
+                      .status(500)
+                      .json({ message: "Database error", error: err });
+                  }
+
+                  const userId =
+                    userIdResult.length > 0 ? userIdResult[0].userId : null;
+
+                  if (userId) {
+                    const queryFindName =
+                      "SELECT name FROM users WHERE userId = ?";
+                    db.query(queryFindName, [userId], (err, nameResult) => {
+                      if (err) {
+                        return res
+                          .status(500)
+                          .json({ message: "Database error", error: err });
+                      }
+
+                      const headprogramname =
+                        nameResult.length > 0 ? nameResult[0].name : null;
+
+                      const queryFindLeaveBalance =
+                        "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
+                      db.query(
+                        queryFindLeaveBalance,
+                        [user.userId],
+                        (err, balanceResult) => {
+                          if (err) {
+                            return res.status(500).json({
+                              message: "Database error",
+                              error: err,
+                            });
+                          }
+
+                          let annualBalance = 0;
+                          let annualUsed = 0;
+
+                          if (balanceResult.length > 0) {
+                            annualBalance = balanceResult[0].annual_balance;
+                            annualUsed = balanceResult[0].annual_used;
+                          }
+
+                          sendResponse(
+                            email,
+                            res,
+                            user,
+                            userRole,
+                            division,
+                            positionName,
+                            annualBalance,
+                            annualUsed,
+                            headprogramname
+                          );
+                        }
+                      );
+                    });
+                  } else {
+                    handleLeaveBalanceWithoutHeadProgram(
+                      email,
+                      user,
+                      userRole,
+                      positionName,
+                      division,
+                      res
+                    );
+                  }
                 }
-
-                let annualBalance = 0;
-                let annualUsed = 0;
-
-                if (balanceResult.length > 0) {
-                  annualBalance = balanceResult[0].annual_balance;
-                  annualUsed = balanceResult[0].annual_used;
-                }
-
-                sendResponse(
-                  email,
-                  res,
-                  user,
-                  userRole,
-                  division,
-                  positionName,
-                  annualBalance,
-                  annualUsed,
-                  headprogramId
-                );
-              }
-            );
+              );
+            } else {
+              handleLeaveBalanceWithoutHeadProgram(
+                email,
+                user,
+                userRole,
+                positionName,
+                division,
+                res
+              );
+            }
           }
         );
       } else {
@@ -210,7 +263,7 @@ function sendResponse(
   positionName,
   annualBalance,
   annualUsed,
-  headprogramId
+  headprogramname
 ) {
   const token = jwt.sign(
     { id: user.userId, role: user.roleId },
@@ -262,7 +315,7 @@ function sendResponse(
     greeting,
     annualBalance,
     annualUsed,
-    headprogramId,
+    headprogramname,
     phone_number: user.phone_number || null,
     nip_nim: user.nip_nim || null,
     address: user.address || null,

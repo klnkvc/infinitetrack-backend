@@ -728,8 +728,25 @@ function getApprovedLeaveRequests(req, res) {
   }
 
   const query = `
-    SELECT * FROM leave_users
-    WHERE leavestatusId = ?
+    SELECT 
+      lu.leaveId,
+      u.name AS userName,
+      a.name AS approverName,
+      hp.name AS headProgramName,
+      d.name AS divisionName,
+      lt.name AS leaveTypeName,
+      ls.name AS leaveStatusName,
+      lu.startDate,
+      lu.endDate,
+      lu.reason
+    FROM leave_users lu
+    INNER JOIN users u ON lu.userId = u.userId
+    LEFT JOIN users a ON lu.approverId = a.userId
+    LEFT JOIN users hp ON lu.headprogramId = hp.userId
+    LEFT JOIN divisions d ON lu.divisionId = d.divisionId
+    LEFT JOIN leave_types lt ON lu.leavetypeId = lt.leaveTypeId
+    LEFT JOIN leave_status ls ON lu.leavestatusId = ls.leaveStatusId
+    WHERE lu.leavestatusId = ?
   `;
 
   db.query(query, [statusId], (err, results) => {
