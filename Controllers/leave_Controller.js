@@ -730,22 +730,20 @@ function getApprovedLeaveRequests(req, res) {
   const query = `
     SELECT 
       lu.leaveId,
-      u.name AS userName,
-      a.name AS approverName,
-      hp.name AS headProgramName,
-      d.name AS divisionName,
-      lt.name AS leaveTypeName,
-      ls.name AS leaveStatusName,
-      lu.startDate,
-      lu.endDate,
-      lu.reason
+      u.name AS userName,                 -- Nama user yang mengajukan leave
+      lu.start_date,
+      lu.end_date,
+      lt.leavetype AS leavetype,               -- Nama leave type dari tabel leave_type
+      ls.leavestatus AS leavestatus,             -- Nama leave status dari tabel leave_status
+      ha.name AS headprogramName,         -- Nama HeadProgram dari tabel head_program dan users
+      la.role_approver AS role_approver            -- Role approver dari tabel leave_approver
     FROM leave_users lu
     INNER JOIN users u ON lu.userId = u.userId
-    LEFT JOIN users a ON lu.approverId = a.userId
-    LEFT JOIN users hp ON lu.headprogramId = hp.userId
-    LEFT JOIN divisions d ON lu.divisionId = d.divisionId
-    LEFT JOIN leave_type lt ON lu.leavetypeId = lt.leaveTypeId
-    LEFT JOIN leave_status ls ON lu.leavestatusId = ls.leaveStatusId
+    INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
+    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
+    LEFT JOIN head_program hp ON lu.headprogramId = hp.headprogramId
+    LEFT JOIN users ha ON hp.userId = ha.userId
+    LEFT JOIN leave_approver la ON lu.approverId = la.approverId
     WHERE lu.leavestatusId = ?
   `;
 
@@ -757,11 +755,13 @@ function getApprovedLeaveRequests(req, res) {
         .json({ message: "Error fetching approved leave requests" });
     }
 
-    if (results.length === 0) {
-      return res.status(200).json({ message: "empty" });
-    }
+    const formattedResults = results.map((item) => ({
+      ...item,
+      start_date: new Date(item.start_date).toISOString().split("T")[0],
+      end_date: new Date(item.end_date).toISOString().split("T")[0],
+    }));
 
-    res.status(200).json(results);
+    res.status(200).json(formattedResults);
   });
 }
 
