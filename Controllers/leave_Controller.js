@@ -37,10 +37,7 @@ function getProgramIdByProgramName(programName, callback) {
   });
 }
 
-function getProgramAndHeadProgramIdByHeadProgramName(
-  headProgramName,
-  callback
-) {
+function getProgramAndHeadProgramIdByHeadProgramName(headProgramName, callback) {
   const query = `
     SELECT 
       hp.headprogramId,
@@ -55,18 +52,12 @@ function getProgramAndHeadProgramIdByHeadProgramName(
 
   db.query(query, [headProgramName], (err, result) => {
     if (err) {
-      console.error(
-        "Error fetching program and head program IDs:",
-        err.message
-      );
+      console.error("Error fetching program and head program IDs:", err.message);
       return callback(err, null);
     }
 
     if (result.length === 0) {
-      return callback(
-        new Error("No matching head program or program found"),
-        null
-      );
+      return callback(new Error("No matching head program or program found"), null);
     }
 
     const { programId, headprogramId } = result[0];
@@ -76,8 +67,7 @@ function getProgramAndHeadProgramIdByHeadProgramName(
 }
 
 function getHeadProgramIdByProgramId(programId, callback) {
-  const query =
-    "SELECT headprogramId FROM head_program WHERE programId = ? LIMIT 1";
+  const query = "SELECT headprogramId FROM head_program WHERE programId = ? LIMIT 1";
 
   db.query(query, [programId], (err, result) => {
     if (err) {
@@ -113,8 +103,7 @@ function getDivisionIdByDivision(division, callback) {
 }
 
 function getLeavetypeIdByLeaveType(leavetype, callback) {
-  const query =
-    "SELECT leavetypeId FROM leave_type WHERE leavetype = ? LIMIT 1";
+  const query = "SELECT leavetypeId FROM leave_type WHERE leavetype = ? LIMIT 1";
 
   db.query(query, [leavetype], (err, result) => {
     if (err) {
@@ -177,32 +166,11 @@ function updateAnnualUsed(userId, startDate, endDate, callback) {
 }
 
 function handleLeaveRequest(req, res) {
-  const {
-    name,
-    headProgramName,
-    division,
-    start_date,
-    end_date,
-    leavetype,
-    description,
-    phone,
-    address,
-  } = req.body;
+  const { name, headProgramName, division, start_date, end_date, leavetype, description, phone, address } = req.body;
 
   const upload_image = req.file ? req.file.filename : null;
 
-  if (
-    !name ||
-    !headProgramName ||
-    !division ||
-    !start_date ||
-    !end_date ||
-    !leavetype ||
-    !description ||
-    !phone ||
-    !address ||
-    !upload_image
-  ) {
+  if (!name || !headProgramName || !division || !start_date || !end_date || !leavetype || !description || !phone || !address || !upload_image) {
     if (upload_image) {
       fs.unlink(req.file.path, (err) => {
         if (err) {
@@ -223,9 +191,19 @@ function handleLeaveRequest(req, res) {
       return res.status(500).json({ message: err.message });
     }
 
-    getProgramAndHeadProgramIdByHeadProgramName(
-      headProgramName,
-      (err, programAndHeadProgram) => {
+    getProgramAndHeadProgramIdByHeadProgramName(headProgramName, (err, programAndHeadProgram) => {
+      if (err) {
+        if (upload_image) {
+          fs.unlink(req.file.path, (err) => {
+            if (err) console.error("Error deleting the file:", err);
+          });
+        }
+        return res.status(500).json({ message: err.message });
+      }
+
+      const { programId, headprogramId } = programAndHeadProgram;
+
+      getDivisionIdByDivision(division, (err, divisionId) => {
         if (err) {
           if (upload_image) {
             fs.unlink(req.file.path, (err) => {
@@ -235,9 +213,7 @@ function handleLeaveRequest(req, res) {
           return res.status(500).json({ message: err.message });
         }
 
-        const { programId, headprogramId } = programAndHeadProgram;
-
-        getDivisionIdByDivision(division, (err, divisionId) => {
+        getLeavetypeIdByLeaveType(leavetype, (err, leavetypeId) => {
           if (err) {
             if (upload_image) {
               fs.unlink(req.file.path, (err) => {
@@ -247,115 +223,97 @@ function handleLeaveRequest(req, res) {
             return res.status(500).json({ message: err.message });
           }
 
-          getLeavetypeIdByLeaveType(leavetype, (err, leavetypeId) => {
-            if (err) {
-              if (upload_image) {
-                fs.unlink(req.file.path, (err) => {
-                  if (err) console.error("Error deleting the file:", err);
+          if (leavetypeId === 4) {
+            checkAnnualUsage(userId, (err, leaveBalance) => {
+              if (err) {
+                if (upload_image) {
+                  fs.unlink(req.file.path, (err) => {
+                    if (err) console.error("Error deleting the file:", err);
+                  });
+                }
+                return res.status(500).json({ message: "Error checking leave balance" });
+              }
+
+              const { annual_used, annual_balance } = leaveBalance;
+              const start = new Date(start_date);
+              const end = new Date(end_date);
+              const diffTime = Math.abs(end - start);
+              const daysRequested = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+              if (annual_used + daysRequested > annual_balance) {
+                if (upload_image) {
+                  fs.unlink(req.file.path, (err) => {
+                    if (err) console.error("Error deleting the file:", err);
+                  });
+                }
+                return res.status(400).json({
+                  message: "You Have Reached Your Annual Limit. Leave Rejected. Please Wait for New Annual Leave :D",
                 });
               }
-              return res.status(500).json({ message: err.message });
-            }
 
-            if (leavetypeId === 4) {
-              checkAnnualUsage(userId, (err, leaveBalance) => {
+              updateAnnualUsed(userId, start_date, end_date, (err) => {
                 if (err) {
                   if (upload_image) {
                     fs.unlink(req.file.path, (err) => {
                       if (err) console.error("Error deleting the file:", err);
                     });
                   }
-                  return res
-                    .status(500)
-                    .json({ message: "Error checking leave balance" });
+                  return res.status(500).json({ message: "Error updating leave balance" });
                 }
 
-                const { annual_used, annual_balance } = leaveBalance;
-                const start = new Date(start_date);
-                const end = new Date(end_date);
-                const diffTime = Math.abs(end - start);
-                const daysRequested =
-                  Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                insertLeaveRequest(
+                  {
+                    userId,
+                    headprogramId,
+                    divisionId,
+                    start_date,
+                    end_date,
+                    leavetypeId,
+                    description,
+                    phone,
+                    address,
+                    upload_image,
+                  },
+                  (err, result) => {
+                    if (err) {
+                      return res.status(500).json({ message: "DB Error" });
+                    }
 
-                if (annual_used + daysRequested > annual_balance) {
-                  if (upload_image) {
-                    fs.unlink(req.file.path, (err) => {
-                      if (err) console.error("Error deleting the file:", err);
+                    return res.status(201).json({
+                      message: "Leave request submitted successfully, annual leave balance updated",
                     });
                   }
-                  return res.status(400).json({
-                    message:
-                      "You Have Reached Your Annual Limit. Leave Rejected. Please Wait for New Annual Leave :D",
-                  });
-                }
-
-                updateAnnualUsed(userId, start_date, end_date, (err) => {
-                  if (err) {
-                    if (upload_image) {
-                      fs.unlink(req.file.path, (err) => {
-                        if (err) console.error("Error deleting the file:", err);
-                      });
-                    }
-                    return res
-                      .status(500)
-                      .json({ message: "Error updating leave balance" });
-                  }
-
-                  insertLeaveRequest(
-                    {
-                      userId,
-                      headprogramId,
-                      divisionId,
-                      start_date,
-                      end_date,
-                      leavetypeId,
-                      description,
-                      phone,
-                      address,
-                      upload_image,
-                    },
-                    (err, result) => {
-                      if (err) {
-                        return res.status(500).json({ message: "DB Error" });
-                      }
-
-                      return res.status(201).json({
-                        message:
-                          "Leave request submitted successfully, annual leave balance updated",
-                      });
-                    }
-                  );
-                });
+                );
               });
-            } else {
-              insertLeaveRequest(
-                {
-                  userId,
-                  headprogramId,
-                  divisionId,
-                  start_date,
-                  end_date,
-                  leavetypeId,
-                  description,
-                  phone,
-                  address,
-                  upload_image,
-                },
-                (err, result) => {
-                  if (err) {
-                    return res.status(500).json({ message: "DB Error" });
-                  }
-
-                  res.status(201).json({
-                    message: "Leave request submitted successfully",
-                  });
+            });
+          } else {
+            insertLeaveRequest(
+              {
+                userId,
+                headprogramId,
+                divisionId,
+                start_date,
+                end_date,
+                leavetypeId,
+                description,
+                phone,
+                address,
+                upload_image,
+              },
+              (err, result) => {
+                if (err) {
+                  return res.status(500).json({ message: "DB Error" });
                 }
-              );
-            }
-          });
+
+                res.status(201).json({
+                  message: "Leave request submitted successfully",
+                });
+              }
+            );
+          }
         });
-      }
-    );
+      });
+    });
   });
 }
 
@@ -401,30 +359,14 @@ function insertLeaveRequest(data, callback) {
     (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  db.query(
-    query,
-    [
-      data.userId,
-      data.headprogramId,
-      data.divisionId,
-      data.start_date,
-      data.end_date,
-      data.leavetypeId,
-      data.description,
-      data.phone,
-      data.address,
-      data.upload_image,
-      leavestatusId,
-    ],
-    (err, result) => {
-      if (err) {
-        console.error("Error inserting leave request:", err.message);
-        return callback(err, null);
-      }
-
-      callback(null, result);
+  db.query(query, [data.userId, data.headprogramId, data.divisionId, data.start_date, data.end_date, data.leavetypeId, data.description, data.phone, data.address, data.upload_image, leavestatusId], (err, result) => {
+    if (err) {
+      console.error("Error inserting leave request:", err.message);
+      return callback(err, null);
     }
-  );
+
+    callback(null, result);
+  });
 }
 
 function getAllLeaveUsers(req, res) {
@@ -441,9 +383,7 @@ function getAllLeaveUsers(req, res) {
   db.query(query, (err, result) => {
     if (err) {
       console.error("Error fetching leave users data:", err.message);
-      return res
-        .status(500)
-        .json({ message: "Error fetching leave users data" });
+      return res.status(500).json({ message: "Error fetching leave users data" });
     }
 
     res.status(200).json({ data: result });
@@ -465,21 +405,16 @@ function approveByHeadProgram(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error approving by HeadProgram:", err.message);
-        return res
-          .status(500)
-          .json({ message: "Approval error by HeadProgram" });
+        return res.status(500).json({ message: "Approval error by HeadProgram" });
       }
 
       if (result.affectedRows === 0) {
         return res.status(400).json({
-          message:
-            "Leave request not found or already processed by HeadProgram",
+          message: "Leave request not found or already processed by HeadProgram",
         });
       }
 
-      res
-        .status(200)
-        .json({ message: "Leave request approved by HeadProgram" });
+      res.status(200).json({ message: "Leave request approved by HeadProgram" });
     });
   } else if (approvalStatus === "declined") {
     const query = `
@@ -492,21 +427,16 @@ function approveByHeadProgram(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error declining by HeadProgram:", err.message);
-        return res
-          .status(500)
-          .json({ message: "Decline error by HeadProgram" });
+        return res.status(500).json({ message: "Decline error by HeadProgram" });
       }
 
       if (result.affectedRows === 0) {
         return res.status(400).json({
-          message:
-            "Leave request not found or already processed by HeadProgram",
+          message: "Leave request not found or already processed by HeadProgram",
         });
       }
 
-      res
-        .status(200)
-        .json({ message: "Leave request declined by HeadProgram" });
+      res.status(200).json({ message: "Leave request declined by HeadProgram" });
     });
   } else {
     res.status(400).json({
@@ -530,9 +460,7 @@ function approveByOperational(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error approving by Operational:", err.message);
-        return res
-          .status(500)
-          .json({ message: "Approval error by Operational" });
+        return res.status(500).json({ message: "Approval error by Operational" });
       }
 
       if (result.affectedRows === 0) {
@@ -541,9 +469,7 @@ function approveByOperational(req, res) {
         });
       }
 
-      res
-        .status(200)
-        .json({ message: "Leave request approved by Operational" });
+      res.status(200).json({ message: "Leave request approved by Operational" });
     });
   } else if (approvalStatus === "declined") {
     const query = `
@@ -556,9 +482,7 @@ function approveByOperational(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error declining by Operational:", err.message);
-        return res
-          .status(500)
-          .json({ message: "Decline error by Operational" });
+        return res.status(500).json({ message: "Decline error by Operational" });
       }
 
       if (result.affectedRows === 0) {
@@ -567,9 +491,7 @@ function approveByOperational(req, res) {
         });
       }
 
-      res
-        .status(200)
-        .json({ message: "Leave request declined by Operational" });
+      res.status(200).json({ message: "Leave request declined by Operational" });
     });
   } else {
     res.status(400).json({
@@ -592,9 +514,7 @@ function approveByProgramDirector(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error approving by Program Director:", err.message);
-        return res
-          .status(500)
-          .json({ message: "Approval error by Program Director" });
+        return res.status(500).json({ message: "Approval error by Program Director" });
       }
 
       if (result.affectedRows === 0) {
@@ -603,9 +523,7 @@ function approveByProgramDirector(req, res) {
         });
       }
 
-      res
-        .status(200)
-        .json({ message: "Leave request approved by Program Director" });
+      res.status(200).json({ message: "Leave request approved by Program Director" });
     });
   } else if (approvalStatus === "declined") {
     const query = `
@@ -617,9 +535,7 @@ function approveByProgramDirector(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error declining by Program Director:", err.message);
-        return res
-          .status(500)
-          .json({ message: "Decline error by Program Director" });
+        return res.status(500).json({ message: "Decline error by Program Director" });
       }
 
       if (result.affectedRows === 0) {
@@ -628,9 +544,7 @@ function approveByProgramDirector(req, res) {
         });
       }
 
-      res
-        .status(200)
-        .json({ message: "Leave request declined by Program Director" });
+      res.status(200).json({ message: "Leave request declined by Program Director" });
     });
   } else {
     res.status(400).json({
@@ -658,23 +572,43 @@ function getAssignedLeaveRequests(req, res) {
   }
 
   const query = `
-    SELECT * FROM leave_users
-    WHERE leavestatusId = ?
+    SELECT 
+      lu.leaveId,
+      u.name AS userName,                 -- Nama user yang mengajukan leave
+      lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
+      lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
+      lu.submitted_at,
+      lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
+    FROM leave_users lu
+    INNER JOIN users u ON lu.userId = u.userId
+    INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
+    INNER JOIN leave_balance lb ON lu.userId = lb.userId
+    WHERE lu.leavestatusId = ?
   `;
 
   db.query(query, [statusId], (err, results) => {
     if (err) {
       console.error("Error fetching assigned leave requests:", err.message);
-      return res
-        .status(500)
-        .json({ message: "Error fetching assigned leave requests" });
+      return res.status(500).json({ message: "Error fetching assigned leave requests" });
     }
 
     if (results.length === 0) {
       return res.status(200).json({ message: "empty" });
     }
 
-    res.status(200).json(results);
+    const formattedResults = results.map((item) => ({
+      ...item,
+      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).replace(/,([^\s])/, ', $1'),
+    }));
+
+    res.status(200).json(formattedResults);
   });
 }
 
@@ -689,23 +623,43 @@ function getDeclinedLeaveRequests(req, res) {
   const statusId = 5;
 
   const query = `
-    SELECT * FROM leave_users
-    WHERE leavestatusId = ?
+    SELECT 
+      lu.leaveId,
+      u.name AS userName,                 -- Nama user yang mengajukan leave
+      lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
+      lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
+      lu.submitted_at,
+      lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
+    FROM leave_users lu
+    INNER JOIN users u ON lu.userId = u.userId
+    INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
+    INNER JOIN leave_balance lb ON lu.userId = lb.userId
+    WHERE lu.leavestatusId = ?
   `;
 
   db.query(query, [statusId], (err, results) => {
     if (err) {
       console.error("Error fetching declined leave requests:", err.message);
-      return res
-        .status(500)
-        .json({ message: "Error fetching declined leave requests" });
+      return res.status(500).json({ message: "Error fetching declined leave requests" });
     }
 
     if (results.length === 0) {
       return res.status(200).json({ message: "empty" });
     }
 
-    res.status(200).json(results);
+    const formattedResults = results.map((item) => ({
+      ...item,
+      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).replace(/,([^\s])/, ', $1'),
+    }));
+
+    res.status(200).json(formattedResults);
   });
 }
 
@@ -731,34 +685,37 @@ function getApprovedLeaveRequests(req, res) {
     SELECT 
       lu.leaveId,
       u.name AS userName,                 -- Nama user yang mengajukan leave
-      lu.start_date,
-      lu.end_date,
-      lt.leavetype AS leavetype,               -- Nama leave type dari tabel leave_type
-      ls.leavestatus AS leavestatus,             -- Nama leave status dari tabel leave_status
-      ha.name AS headprogramName,         -- Nama HeadProgram dari tabel head_program dan users
-      la.role_approver AS role_approver            -- Role approver dari tabel leave_approver
+      lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
+      lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
+      lu.submitted_at,
+      lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
     FROM leave_users lu
     INNER JOIN users u ON lu.userId = u.userId
     INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
-    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
-    LEFT JOIN head_program hp ON lu.headprogramId = hp.headprogramId
-    LEFT JOIN users ha ON hp.userId = ha.userId
-    LEFT JOIN leave_approver la ON lu.approverId = la.approverId
+    INNER JOIN leave_balance lb ON lu.userId = lb.userId
     WHERE lu.leavestatusId = ?
   `;
 
   db.query(query, [statusId], (err, results) => {
     if (err) {
       console.error("Error fetching approved leave requests:", err.message);
-      return res
-        .status(500)
-        .json({ message: "Error fetching approved leave requests" });
+      return res.status(500).json({ message: "Error fetching approved leave requests" });
+    }
+
+    if (results.length === 0) {
+      return res.status(200).json({ message: "empty" });
     }
 
     const formattedResults = results.map((item) => ({
       ...item,
-      start_date: new Date(item.start_date).toISOString().split("T")[0],
-      end_date: new Date(item.end_date).toISOString().split("T")[0],
+      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).replace(/,([^\s])/, ', $1'),
     }));
 
     res.status(200).json(formattedResults);
