@@ -141,7 +141,6 @@ const getAttendanceOverview = (req, res) => {
   db.query(
     `SELECT 
         COUNT(*) AS total_attendance,
-        SUM(CASE WHEN check_in_time IS NULL THEN 1 ELSE 0 END) AS active_attendance,
         SUM(CASE WHEN check_out_time IS NULL THEN 1 ELSE 0 END) AS active_attendance,
         SUM(CASE WHEN attendance_status_id = 1 THEN 1 ELSE 0 END) AS on_time,
         SUM(CASE WHEN attendance_status_id = 2 THEN 1 ELSE 0 END) AS late
