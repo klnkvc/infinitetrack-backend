@@ -1,5 +1,8 @@
 const express = require("express");
-const { handleAttendance } = require("../Controllers/attendance_Controller");
+const {
+  handleAttendance,
+  getAttendanceOverview,
+} = require("../Controllers/attendance_Controller");
 const { verifyToken } = require("../middleware/authMiddleWare");
 const multer = require("multer");
 
@@ -27,5 +30,7 @@ router.post(
   upload.single("upload_image"),
   handleAttendance
 );
+
+router.get("/users/overview", getAttendanceOverview);
 
 module.exports = router;

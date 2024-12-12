@@ -135,6 +135,36 @@ const handleAttendance = (req, res) => {
   }
 };
 
+const getAttendanceOverview = (req, res) => {
+  const userId = req.user.id;
+
+  db.query(
+    `SELECT 
+        COUNT(*) AS total_attendance,
+        SUM(CASE WHEN check_in_time IS NULL THEN 1 ELSE 0 END) AS active_attendance,
+        SUM(CASE WHEN check_out_time IS NULL THEN 1 ELSE 0 END) AS active_attendance,
+        SUM(CASE WHEN attendance_status_id = 1 THEN 1 ELSE 0 END) AS on_time,
+        SUM(CASE WHEN attendance_status_id = 2 THEN 1 ELSE 0 END) AS late
+      FROM attendance
+      WHERE userId = ?`,
+    [userId],
+    (err, result) => {
+      if (err) {
+        console.error("Error fetching attendance overview:", err.message);
+        return res
+          .status(500)
+          .json({ message: "Failed to fetch attendance overview" });
+      }
+
+      res.status(200).json({
+        message: "Attendance overview fetched successfully",
+        overview: result[0],
+      });
+    }
+  );
+};
+
 module.exports = {
   handleAttendance,
+  getAttendanceOverview,
 };
