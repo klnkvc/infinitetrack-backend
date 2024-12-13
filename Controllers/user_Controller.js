@@ -226,6 +226,10 @@ const updateUser = (req, res) => {
   const { phone_number, nip_nim, address, start_contract, end_contract } =
     req.body;
 
+  const profile_photo = req.file
+    ? `uploads/profile/${req.file.filename}`
+    : null;
+
   const queryGetUser = `
     SELECT nip_nim, address, start_contract, end_contract 
     FROM users 
@@ -234,15 +238,29 @@ const updateUser = (req, res) => {
 
   db.query(queryGetUser, [userId], (err, userResult) => {
     if (err) {
+      console.error("Database error while fetching user:", err);
       return res.status(500).json({ message: "Database error", error: err });
     }
 
     const existingUserData = userResult[0];
-
     const dataIsFullyUpdated =
       existingUserData.nip_nim &&
       existingUserData.start_contract &&
       existingUserData.end_contract;
+
+    const updateUserQuery = (fields, values) => {
+      const setClause = fields.map((field) => `${field} = ?`).join(", ");
+      const query = `UPDATE users SET ${setClause} WHERE userId = ?`;
+      db.query(query, [...values, userId], (err, result) => {
+        if (err) {
+          console.error("Database error while updating user:", err);
+          return res
+            .status(500)
+            .json({ message: "Database error", error: err });
+        }
+        res.status(201).json({ message: "User updated successfully." });
+      });
+    };
 
     if (dataIsFullyUpdated) {
       if (nip_nim || start_contract || end_contract) {
@@ -252,86 +270,79 @@ const updateUser = (req, res) => {
         });
       }
 
-      const queryUpdateUser = `
-        UPDATE users 
-        SET phone_number = ?, address = ?
-        WHERE userId = ?
-      `;
+      const fields = ["phone_number", "address", "profile_photo"].filter(
+        (key) => req.body[key] || key === "profile_photo"
+      );
+      const values = fields.map((field) => req.body[field] || profile_photo);
+
+      return updateUserQuery(fields, values);
+    }
+
+    if (nip_nim && start_contract && end_contract) {
+      const fields = [
+        "phone_number",
+        "nip_nim",
+        "address",
+        "start_contract",
+        "end_contract",
+        "profile_photo",
+      ];
+      const values = [
+        phone_number,
+        nip_nim,
+        address,
+        start_contract,
+        end_contract,
+        profile_photo,
+      ];
+
       db.query(
-        queryUpdateUser,
-        [phone_number, address, userId],
+        `UPDATE users SET phone_number = ?, nip_nim = ?, address = ?, start_contract = ?, end_contract = ?, profile_photo = ? WHERE userId = ?`,
+        [...values, userId],
         (err, result) => {
           if (err) {
+            console.error(
+              "Database error while updating contract details:",
+              err
+            );
             return res
               .status(500)
               .json({ message: "Database error", error: err });
           }
 
-          res.status(201).json({
-            message: "Phone number and address updated successfully.",
-          });
+          const start = new Date(start_contract);
+          const end = new Date(end_contract);
+          const monthsDifference =
+            (end.getFullYear() - start.getFullYear()) * 12 +
+            (end.getMonth() - start.getMonth());
+          const annual_balance = Math.max(0, monthsDifference);
+
+          db.query(
+            `UPDATE leave_balance SET annual_balance = ? WHERE userId = ?`,
+            [annual_balance, userId],
+            (err) => {
+              if (err) {
+                console.error(
+                  "Database error while updating leave balance:",
+                  err
+                );
+                return res
+                  .status(500)
+                  .json({ message: "Database error", error: err });
+              }
+              res.status(201).json({
+                message: "Profile updated successfully.",
+                annual_balance,
+              });
+            }
+          );
         }
       );
     } else {
-      if (nip_nim && start_contract && end_contract) {
-        const queryUpdateUser = `
-          UPDATE users 
-          SET phone_number = ?, nip_nim = ?, address = ?, start_contract = ?, end_contract = ?
-          WHERE userId = ?
-        `;
-        db.query(
-          queryUpdateUser,
-          [
-            phone_number,
-            nip_nim,
-            address,
-            start_contract,
-            end_contract,
-            userId,
-          ],
-          (err, result) => {
-            if (err) {
-              return res
-                .status(500)
-                .json({ message: "Database error", error: err });
-            }
-
-            const start = new Date(start_contract);
-            const end = new Date(end_contract);
-            const monthsDifference =
-              (end.getFullYear() - start.getFullYear()) * 12 +
-              (end.getMonth() - start.getMonth());
-            const annual_balance = Math.max(0, monthsDifference);
-
-            const queryUpdateLeaveBalance = `
-              UPDATE leave_balance 
-              SET annual_balance = ? 
-              WHERE userId = ?
-            `;
-            db.query(
-              queryUpdateLeaveBalance,
-              [annual_balance, userId],
-              (err, result) => {
-                if (err) {
-                  return res
-                    .status(500)
-                    .json({ message: "Database error", error: err });
-                }
-
-                res.status(201).json({
-                  message: "Profile updated successfully.",
-                  annual_balance,
-                });
-              }
-            );
-          }
-        );
-      } else {
-        res.status(400).json({
-          message:
-            "All contract details (nip_nim, start_contract, end_contract) must be provided.",
-        });
-      }
+      res.status(400).json({
+        message:
+          "All contract details (nip_nim, start_contract, end_contract) must be provided.",
+      });
     }
   });
 };

@@ -37,7 +37,10 @@ function getProgramIdByProgramName(programName, callback) {
   });
 }
 
-function getProgramAndHeadProgramIdByHeadProgramName(headProgramName, callback) {
+function getProgramAndHeadProgramIdByHeadProgramName(
+  headProgramName,
+  callback
+) {
   const query = `
     SELECT 
       hp.headprogramId,
@@ -52,12 +55,18 @@ function getProgramAndHeadProgramIdByHeadProgramName(headProgramName, callback) 
 
   db.query(query, [headProgramName], (err, result) => {
     if (err) {
-      console.error("Error fetching program and head program IDs:", err.message);
+      console.error(
+        "Error fetching program and head program IDs:",
+        err.message
+      );
       return callback(err, null);
     }
 
     if (result.length === 0) {
-      return callback(new Error("No matching head program or program found"), null);
+      return callback(
+        new Error("No matching head program or program found"),
+        null
+      );
     }
 
     const { programId, headprogramId } = result[0];
@@ -67,7 +76,8 @@ function getProgramAndHeadProgramIdByHeadProgramName(headProgramName, callback) 
 }
 
 function getHeadProgramIdByProgramId(programId, callback) {
-  const query = "SELECT headprogramId FROM head_program WHERE programId = ? LIMIT 1";
+  const query =
+    "SELECT headprogramId FROM head_program WHERE programId = ? LIMIT 1";
 
   db.query(query, [programId], (err, result) => {
     if (err) {
@@ -103,7 +113,8 @@ function getDivisionIdByDivision(division, callback) {
 }
 
 function getLeavetypeIdByLeaveType(leavetype, callback) {
-  const query = "SELECT leavetypeId FROM leave_type WHERE leavetype = ? LIMIT 1";
+  const query =
+    "SELECT leavetypeId FROM leave_type WHERE leavetype = ? LIMIT 1";
 
   db.query(query, [leavetype], (err, result) => {
     if (err) {
@@ -166,11 +177,32 @@ function updateAnnualUsed(userId, startDate, endDate, callback) {
 }
 
 function handleLeaveRequest(req, res) {
-  const { name, headProgramName, division, start_date, end_date, leavetype, description, phone, address } = req.body;
+  const {
+    name,
+    headProgramName,
+    division,
+    start_date,
+    end_date,
+    leavetype,
+    description,
+    phone,
+    address,
+  } = req.body;
 
   const upload_image = req.file ? req.file.filename : null;
 
-  if (!name || !headProgramName || !division || !start_date || !end_date || !leavetype || !description || !phone || !address || !upload_image) {
+  if (
+    !name ||
+    !headProgramName ||
+    !division ||
+    !start_date ||
+    !end_date ||
+    !leavetype ||
+    !description ||
+    !phone ||
+    !address ||
+    !upload_image
+  ) {
     if (upload_image) {
       fs.unlink(req.file.path, (err) => {
         if (err) {
@@ -191,19 +223,9 @@ function handleLeaveRequest(req, res) {
       return res.status(500).json({ message: err.message });
     }
 
-    getProgramAndHeadProgramIdByHeadProgramName(headProgramName, (err, programAndHeadProgram) => {
-      if (err) {
-        if (upload_image) {
-          fs.unlink(req.file.path, (err) => {
-            if (err) console.error("Error deleting the file:", err);
-          });
-        }
-        return res.status(500).json({ message: err.message });
-      }
-
-      const { programId, headprogramId } = programAndHeadProgram;
-
-      getDivisionIdByDivision(division, (err, divisionId) => {
+    getProgramAndHeadProgramIdByHeadProgramName(
+      headProgramName,
+      (err, programAndHeadProgram) => {
         if (err) {
           if (upload_image) {
             fs.unlink(req.file.path, (err) => {
@@ -213,7 +235,9 @@ function handleLeaveRequest(req, res) {
           return res.status(500).json({ message: err.message });
         }
 
-        getLeavetypeIdByLeaveType(leavetype, (err, leavetypeId) => {
+        const { programId, headprogramId } = programAndHeadProgram;
+
+        getDivisionIdByDivision(division, (err, divisionId) => {
           if (err) {
             if (upload_image) {
               fs.unlink(req.file.path, (err) => {
@@ -223,97 +247,115 @@ function handleLeaveRequest(req, res) {
             return res.status(500).json({ message: err.message });
           }
 
-          if (leavetypeId === 4) {
-            checkAnnualUsage(userId, (err, leaveBalance) => {
-              if (err) {
-                if (upload_image) {
-                  fs.unlink(req.file.path, (err) => {
-                    if (err) console.error("Error deleting the file:", err);
-                  });
-                }
-                return res.status(500).json({ message: "Error checking leave balance" });
-              }
-
-              const { annual_used, annual_balance } = leaveBalance;
-              const start = new Date(start_date);
-              const end = new Date(end_date);
-              const diffTime = Math.abs(end - start);
-              const daysRequested = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-
-              if (annual_used + daysRequested > annual_balance) {
-                if (upload_image) {
-                  fs.unlink(req.file.path, (err) => {
-                    if (err) console.error("Error deleting the file:", err);
-                  });
-                }
-                return res.status(400).json({
-                  message: "You Have Reached Your Annual Limit. Leave Rejected. Please Wait for New Annual Leave :D",
+          getLeavetypeIdByLeaveType(leavetype, (err, leavetypeId) => {
+            if (err) {
+              if (upload_image) {
+                fs.unlink(req.file.path, (err) => {
+                  if (err) console.error("Error deleting the file:", err);
                 });
               }
+              return res.status(500).json({ message: err.message });
+            }
 
-              updateAnnualUsed(userId, start_date, end_date, (err) => {
+            if (leavetypeId === 4) {
+              checkAnnualUsage(userId, (err, leaveBalance) => {
                 if (err) {
                   if (upload_image) {
                     fs.unlink(req.file.path, (err) => {
                       if (err) console.error("Error deleting the file:", err);
                     });
                   }
-                  return res.status(500).json({ message: "Error updating leave balance" });
+                  return res
+                    .status(500)
+                    .json({ message: "Error checking leave balance" });
                 }
 
-                insertLeaveRequest(
-                  {
-                    userId,
-                    headprogramId,
-                    divisionId,
-                    start_date,
-                    end_date,
-                    leavetypeId,
-                    description,
-                    phone,
-                    address,
-                    upload_image,
-                  },
-                  (err, result) => {
-                    if (err) {
-                      return res.status(500).json({ message: "DB Error" });
-                    }
+                const { annual_used, annual_balance } = leaveBalance;
+                const start = new Date(start_date);
+                const end = new Date(end_date);
+                const diffTime = Math.abs(end - start);
+                const daysRequested =
+                  Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
-                    return res.status(201).json({
-                      message: "Leave request submitted successfully, annual leave balance updated",
+                if (annual_used + daysRequested > annual_balance) {
+                  if (upload_image) {
+                    fs.unlink(req.file.path, (err) => {
+                      if (err) console.error("Error deleting the file:", err);
                     });
                   }
-                );
-              });
-            });
-          } else {
-            insertLeaveRequest(
-              {
-                userId,
-                headprogramId,
-                divisionId,
-                start_date,
-                end_date,
-                leavetypeId,
-                description,
-                phone,
-                address,
-                upload_image,
-              },
-              (err, result) => {
-                if (err) {
-                  return res.status(500).json({ message: "DB Error" });
+                  return res.status(400).json({
+                    message:
+                      "You Have Reached Your Annual Limit. Leave Rejected. Please Wait for New Annual Leave :D",
+                  });
                 }
 
-                res.status(201).json({
-                  message: "Leave request submitted successfully",
+                updateAnnualUsed(userId, start_date, end_date, (err) => {
+                  if (err) {
+                    if (upload_image) {
+                      fs.unlink(req.file.path, (err) => {
+                        if (err) console.error("Error deleting the file:", err);
+                      });
+                    }
+                    return res
+                      .status(500)
+                      .json({ message: "Error updating leave balance" });
+                  }
+
+                  insertLeaveRequest(
+                    {
+                      userId,
+                      headprogramId,
+                      divisionId,
+                      start_date,
+                      end_date,
+                      leavetypeId,
+                      description,
+                      phone,
+                      address,
+                      upload_image,
+                    },
+                    (err, result) => {
+                      if (err) {
+                        return res.status(500).json({ message: "DB Error" });
+                      }
+
+                      return res.status(201).json({
+                        message:
+                          "Leave request submitted successfully, annual leave balance updated",
+                      });
+                    }
+                  );
                 });
-              }
-            );
-          }
+              });
+            } else {
+              insertLeaveRequest(
+                {
+                  userId,
+                  headprogramId,
+                  divisionId,
+                  start_date,
+                  end_date,
+                  leavetypeId,
+                  description,
+                  phone,
+                  address,
+                  upload_image,
+                },
+                (err, result) => {
+                  if (err) {
+                    return res.status(500).json({ message: "DB Error" });
+                  }
+
+                  res.status(201).json({
+                    message: "Leave request submitted successfully",
+                  });
+                }
+              );
+            }
+          });
         });
-      });
-    });
+      }
+    );
   });
 }
 
@@ -359,34 +401,69 @@ function insertLeaveRequest(data, callback) {
     (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId) 
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-  db.query(query, [data.userId, data.headprogramId, data.divisionId, data.start_date, data.end_date, data.leavetypeId, data.description, data.phone, data.address, data.upload_image, leavestatusId], (err, result) => {
-    if (err) {
-      console.error("Error inserting leave request:", err.message);
-      return callback(err, null);
-    }
+  db.query(
+    query,
+    [
+      data.userId,
+      data.headprogramId,
+      data.divisionId,
+      data.start_date,
+      data.end_date,
+      data.leavetypeId,
+      data.description,
+      data.phone,
+      data.address,
+      data.upload_image,
+      leavestatusId,
+    ],
+    (err, result) => {
+      if (err) {
+        console.error("Error inserting leave request:", err.message);
+        return callback(err, null);
+      }
 
-    callback(null, result);
-  });
+      callback(null, result);
+    }
+  );
 }
 
 function getAllLeaveUsers(req, res) {
   const query = `
-    SELECT lu.leaveId, lu.userId, u.name AS userName, lu.start_date, lu.end_date, 
-           lt.leavetype AS leaveType, lu.description, lu.phone, lu.address, 
-           lu.upload_image, lu.leavestatusId, ls.leaveStatus AS leaveStatus
+    SELECT u.name AS userName, u.profile_photo, d.division, lu.start_date, lu.end_date, lu.submitted_at
     FROM leave_users lu
     JOIN users u ON lu.userId = u.userId
-    JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
-    JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
+    JOIN divisions d ON u.divisionId = d.divisionId
   `;
 
   db.query(query, (err, result) => {
     if (err) {
       console.error("Error fetching leave users data:", err.message);
-      return res.status(500).json({ message: "Error fetching leave users data" });
+      return res
+        .status(500)
+        .json({ message: "Error fetching leave users data" });
     }
 
-    res.status(200).json({ data: result });
+    const formatDateTime = (dateTime) => {
+      const date = new Date(dateTime);
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mi = String(date.getMinutes()).padStart(2, "0");
+      const ss = String(date.getSeconds()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+    };
+
+    const formattedResult = result.map((item) => ({
+      userName: item.userName,
+      profile_photo: item.profile_photo,
+      division: item.division,
+      start_date: formatDateTime(item.start_date),
+      end_date: formatDateTime(item.end_date),
+      submitted_at: formatDateTime(item.submitted_at),
+    }));
+
+    res.status(200).json({ data: formattedResult });
   });
 }
 
@@ -405,16 +482,21 @@ function approveByHeadProgram(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error approving by HeadProgram:", err.message);
-        return res.status(500).json({ message: "Approval error by HeadProgram" });
+        return res
+          .status(500)
+          .json({ message: "Approval error by HeadProgram" });
       }
 
       if (result.affectedRows === 0) {
         return res.status(400).json({
-          message: "Leave request not found or already processed by HeadProgram",
+          message:
+            "Leave request not found or already processed by HeadProgram",
         });
       }
 
-      res.status(200).json({ message: "Leave request approved by HeadProgram" });
+      res
+        .status(200)
+        .json({ message: "Leave request approved by HeadProgram" });
     });
   } else if (approvalStatus === "declined") {
     const query = `
@@ -427,16 +509,21 @@ function approveByHeadProgram(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error declining by HeadProgram:", err.message);
-        return res.status(500).json({ message: "Decline error by HeadProgram" });
+        return res
+          .status(500)
+          .json({ message: "Decline error by HeadProgram" });
       }
 
       if (result.affectedRows === 0) {
         return res.status(400).json({
-          message: "Leave request not found or already processed by HeadProgram",
+          message:
+            "Leave request not found or already processed by HeadProgram",
         });
       }
 
-      res.status(200).json({ message: "Leave request declined by HeadProgram" });
+      res
+        .status(200)
+        .json({ message: "Leave request declined by HeadProgram" });
     });
   } else {
     res.status(400).json({
@@ -460,7 +547,9 @@ function approveByOperational(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error approving by Operational:", err.message);
-        return res.status(500).json({ message: "Approval error by Operational" });
+        return res
+          .status(500)
+          .json({ message: "Approval error by Operational" });
       }
 
       if (result.affectedRows === 0) {
@@ -469,7 +558,9 @@ function approveByOperational(req, res) {
         });
       }
 
-      res.status(200).json({ message: "Leave request approved by Operational" });
+      res
+        .status(200)
+        .json({ message: "Leave request approved by Operational" });
     });
   } else if (approvalStatus === "declined") {
     const query = `
@@ -482,7 +573,9 @@ function approveByOperational(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error declining by Operational:", err.message);
-        return res.status(500).json({ message: "Decline error by Operational" });
+        return res
+          .status(500)
+          .json({ message: "Decline error by Operational" });
       }
 
       if (result.affectedRows === 0) {
@@ -491,7 +584,9 @@ function approveByOperational(req, res) {
         });
       }
 
-      res.status(200).json({ message: "Leave request declined by Operational" });
+      res
+        .status(200)
+        .json({ message: "Leave request declined by Operational" });
     });
   } else {
     res.status(400).json({
@@ -514,7 +609,9 @@ function approveByProgramDirector(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error approving by Program Director:", err.message);
-        return res.status(500).json({ message: "Approval error by Program Director" });
+        return res
+          .status(500)
+          .json({ message: "Approval error by Program Director" });
       }
 
       if (result.affectedRows === 0) {
@@ -523,7 +620,9 @@ function approveByProgramDirector(req, res) {
         });
       }
 
-      res.status(200).json({ message: "Leave request approved by Program Director" });
+      res
+        .status(200)
+        .json({ message: "Leave request approved by Program Director" });
     });
   } else if (approvalStatus === "declined") {
     const query = `
@@ -535,7 +634,9 @@ function approveByProgramDirector(req, res) {
     db.query(query, [leaveId], (err, result) => {
       if (err) {
         console.error("Error declining by Program Director:", err.message);
-        return res.status(500).json({ message: "Decline error by Program Director" });
+        return res
+          .status(500)
+          .json({ message: "Decline error by Program Director" });
       }
 
       if (result.affectedRows === 0) {
@@ -544,7 +645,9 @@ function approveByProgramDirector(req, res) {
         });
       }
 
-      res.status(200).json({ message: "Leave request declined by Program Director" });
+      res
+        .status(200)
+        .json({ message: "Leave request declined by Program Director" });
     });
   } else {
     res.status(400).json({
@@ -589,7 +692,9 @@ function getAssignedLeaveRequests(req, res) {
   db.query(query, [statusId], (err, results) => {
     if (err) {
       console.error("Error fetching assigned leave requests:", err.message);
-      return res.status(500).json({ message: "Error fetching assigned leave requests" });
+      return res
+        .status(500)
+        .json({ message: "Error fetching assigned leave requests" });
     }
 
     if (results.length === 0) {
@@ -598,14 +703,16 @@ function getAssignedLeaveRequests(req, res) {
 
     const formattedResults = results.map((item) => ({
       ...item,
-      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/,([^\s])/, ', $1'),
+      submitted_at: new Date(item.submitted_at)
+        .toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        .replace(/,([^\s])/, ", $1"),
     }));
 
     res.status(200).json(formattedResults);
@@ -640,7 +747,9 @@ function getDeclinedLeaveRequests(req, res) {
   db.query(query, [statusId], (err, results) => {
     if (err) {
       console.error("Error fetching declined leave requests:", err.message);
-      return res.status(500).json({ message: "Error fetching declined leave requests" });
+      return res
+        .status(500)
+        .json({ message: "Error fetching declined leave requests" });
     }
 
     if (results.length === 0) {
@@ -649,14 +758,16 @@ function getDeclinedLeaveRequests(req, res) {
 
     const formattedResults = results.map((item) => ({
       ...item,
-      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/,([^\s])/, ', $1'),
+      submitted_at: new Date(item.submitted_at)
+        .toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        .replace(/,([^\s])/, ", $1"),
     }));
 
     res.status(200).json(formattedResults);
@@ -699,7 +810,9 @@ function getApprovedLeaveRequests(req, res) {
   db.query(query, [statusId], (err, results) => {
     if (err) {
       console.error("Error fetching approved leave requests:", err.message);
-      return res.status(500).json({ message: "Error fetching approved leave requests" });
+      return res
+        .status(500)
+        .json({ message: "Error fetching approved leave requests" });
     }
 
     if (results.length === 0) {
@@ -708,14 +821,16 @@ function getApprovedLeaveRequests(req, res) {
 
     const formattedResults = results.map((item) => ({
       ...item,
-      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/,([^\s])/, ', $1'),
+      submitted_at: new Date(item.submitted_at)
+        .toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        .replace(/,([^\s])/, ", $1"),
     }));
 
     res.status(200).json(formattedResults);
