@@ -226,12 +226,10 @@ const updateUser = (req, res) => {
   const { phone_number, nip_nim, address, start_contract, end_contract } =
     req.body;
 
-  const profile_photo = req.file
-    ? `uploads/profile/${req.file.filename}`
-    : null;
+  const profile_photo = req.file ? req.file.path : null;
 
   const queryGetUser = `
-    SELECT nip_nim, address, start_contract, end_contract 
+    SELECT nip_nim, address, start_contract, end_contract, profile_photo
     FROM users 
     WHERE userId = ?
   `;
@@ -251,6 +249,7 @@ const updateUser = (req, res) => {
     const updateUserQuery = (fields, values) => {
       const setClause = fields.map((field) => `${field} = ?`).join(", ");
       const query = `UPDATE users SET ${setClause} WHERE userId = ?`;
+
       db.query(query, [...values, userId], (err, result) => {
         if (err) {
           console.error("Database error while updating user:", err);
@@ -270,10 +269,29 @@ const updateUser = (req, res) => {
         });
       }
 
-      const fields = ["phone_number", "address", "profile_photo"].filter(
-        (key) => req.body[key] || key === "profile_photo"
-      );
-      const values = fields.map((field) => req.body[field] || profile_photo);
+      const fields = [];
+      const values = [];
+
+      if (phone_number) {
+        fields.push("phone_number");
+        values.push(phone_number);
+      }
+
+      if (address) {
+        fields.push("address");
+        values.push(address);
+      }
+
+      if (profile_photo) {
+        fields.push("profile_photo");
+        values.push(profile_photo);
+      }
+
+      if (fields.length === 0) {
+        return res.status(400).json({
+          message: "No fields to update.",
+        });
+      }
 
       return updateUserQuery(fields, values);
     }
@@ -285,7 +303,6 @@ const updateUser = (req, res) => {
         "address",
         "start_contract",
         "end_contract",
-        "profile_photo",
       ];
       const values = [
         phone_number,
@@ -293,11 +310,15 @@ const updateUser = (req, res) => {
         address,
         start_contract,
         end_contract,
-        profile_photo,
       ];
 
+      if (profile_photo) {
+        fields.push("profile_photo");
+        values.push(profile_photo);
+      }
+
       db.query(
-        `UPDATE users SET phone_number = ?, nip_nim = ?, address = ?, start_contract = ?, end_contract = ?, profile_photo = ? WHERE userId = ?`,
+        `UPDATE users SET ${fields.map((f) => `${f} = ?`).join(", ")} WHERE userId = ?`,
         [...values, userId],
         (err, result) => {
           if (err) {
