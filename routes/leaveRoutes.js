@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const upload = require("../middleware/upload");
+const uploadLeaveUsers = require("../middleware/uploadLeaveUsers");
 const {
   handleLeaveRequest,
   getAllLeaveUsers,
@@ -12,7 +12,7 @@ const {
   getApprovedLeaveRequests,
 } = require("../Controllers/leave_Controller");
 
-router.post("/users", upload.single("upload_image"), handleLeaveRequest);
+router.post("/users", uploadLeaveUsers.single("upload_image"), handleLeaveRequest);
 router.post("/users/:leaveId/headprogram/approve", approveByHeadProgram);
 router.post("/users/:leaveId/operational/approve", approveByOperational);
 router.post(
