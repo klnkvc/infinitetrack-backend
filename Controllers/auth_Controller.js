@@ -267,8 +267,7 @@ function sendResponse(
 ) {
   const token = jwt.sign(
     { id: user.userId, role: user.roleId },
-    process.env.JWT_SECRET,
-    { expiresIn: "1h" }
+    process.env.JWT_SECRET
   );
 
   const userId = user.userId;
