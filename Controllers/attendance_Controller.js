@@ -11,6 +11,8 @@ const getAttendanceStatusId = (status) => {
 };
 
 const officeLocation = {
+  latitude: 1.1853587, // Latitude yang benar
+  longitude: 104.1021903,
   latitude: 1.1853258302684722,
   longitude: 104.10194910214162,
 };
@@ -143,9 +145,15 @@ const getAttendanceOverview = (req, res) => {
         COUNT(*) AS total_attendance,
         SUM(CASE WHEN check_out_time IS NULL THEN 1 ELSE 0 END) AS active_attendance,
         SUM(CASE WHEN attendance_status_id = 1 THEN 1 ELSE 0 END) AS on_time,
-        SUM(CASE WHEN attendance_status_id = 2 THEN 1 ELSE 0 END) AS late
-      FROM attendance
-      WHERE userId = ?`,
+        SUM(CASE WHEN attendance_status_id = 2 THEN 1 ELSE 0 END) AS late,
+        SUM(CASE WHEN is_absence = 1 THEN 1 ELSE 0 END) AS total_absence,
+        SUM(CASE WHEN ac.attendance_category = 'Work From Office' THEN 1 ELSE 0 END) AS total_work_from_office,
+        SUM(CASE WHEN ac.attendance_category = 'Work From Home' THEN 1 ELSE 0 END) AS total_work_from_home,
+        MAX(a.check_in_time) AS check_in_time,
+        MAX(a.check_out_time) AS check_out_time
+      FROM attendance a
+      JOIN attendance_category ac ON a.attendance_category_id = ac.attendance_category_id
+      WHERE a.userId = ? AND a.attendance_date = CURDATE()`,
     [userId],
     (err, result) => {
       if (err) {
@@ -155,9 +163,24 @@ const getAttendanceOverview = (req, res) => {
           .json({ message: "Failed to fetch attendance overview" });
       }
 
+      const formatDateTime = (dateTime) => {
+        const date = new Date(dateTime);
+        const hh = String(date.getHours()).padStart(2, "0");
+        const mi = String(date.getMinutes()).padStart(2, "0");
+        return `${hh}:${mi}`;
+      };
+
+      const overview = result[0];
+      if (overview.check_in_time) {
+        overview.check_in_time = formatDateTime(overview.check_in_time);
+      }
+      if (overview.check_out_time) {
+        overview.check_out_time = formatDateTime(overview.check_out_time);
+      }
+
       res.status(200).json({
         message: "Attendance overview fetched successfully",
-        overview: result[0],
+        overview,
       });
     }
   );
