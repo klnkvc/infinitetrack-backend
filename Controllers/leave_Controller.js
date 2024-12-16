@@ -681,11 +681,13 @@ function getAssignedLeaveRequests(req, res) {
       lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
       lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
       lu.submitted_at,
+      ls.leavestatus,                     -- Status cuti dari tabel leave_status
       lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
     FROM leave_users lu
     INNER JOIN users u ON lu.userId = u.userId
     INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
     INNER JOIN leave_balance lb ON lu.userId = lb.userId
+    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
     WHERE lu.leavestatusId = ?
   `;
 
@@ -736,11 +738,13 @@ function getDeclinedLeaveRequests(req, res) {
       lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
       lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
       lu.submitted_at,
+      ls.leavestatus,                     -- Status cuti dari tabel leave_status
       lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
     FROM leave_users lu
     INNER JOIN users u ON lu.userId = u.userId
     INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
     INNER JOIN leave_balance lb ON lu.userId = lb.userId
+    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
     WHERE lu.leavestatusId = ?
   `;
 
@@ -799,11 +803,13 @@ function getApprovedLeaveRequests(req, res) {
       lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
       lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
       lu.submitted_at,
+      ls.leavestatus,                     -- Status cuti dari tabel leave_status
       lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
     FROM leave_users lu
     INNER JOIN users u ON lu.userId = u.userId
     INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
     INNER JOIN leave_balance lb ON lu.userId = lb.userId
+    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
     WHERE lu.leavestatusId = ?
   `;
 
@@ -821,16 +827,15 @@ function getApprovedLeaveRequests(req, res) {
 
     const formattedResults = results.map((item) => ({
       ...item,
-      submitted_at: new Date(item.submitted_at)
-        .toLocaleString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        })
-        .replace(/,([^\s])/, ", $1"),
+      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).replace(/,([^\s])/, ', $1'),
+      leavestatus: item.leavestatus.replace(/Approved by .*/, 'Approved'),
     }));
 
     res.status(200).json(formattedResults);
