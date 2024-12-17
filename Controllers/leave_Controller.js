@@ -445,13 +445,48 @@ function getAllLeaveUsers(req, res) {
 
     const formatDateTime = (dateTime) => {
       const date = new Date(dateTime);
-      const yyyy = date.getFullYear();
-      const mm = String(date.getMonth() + 1).padStart(2, "0");
-      const dd = String(date.getDate()).padStart(2, "0");
-      const hh = String(date.getHours()).padStart(2, "0");
-      const mi = String(date.getMinutes()).padStart(2, "0");
-      const ss = String(date.getSeconds()).padStart(2, "0");
-      return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+      const day = String(date.getDate()).padStart(2, "0");
+
+      const months = [
+        "Januari",
+        "Februari",
+        "Maret",
+        "April",
+        "Mei",
+        "Juni",
+        "Juli",
+        "Agustus",
+        "September",
+        "Oktober",
+        "November",
+        "Desember",
+      ];
+
+      const month = months[date.getMonth()];
+      const year = date.getFullYear();
+
+      return `${day} ${month} ${year}`;
+    };
+
+    const formatTimeAgo = (submittedAt) => {
+      const now = new Date();
+      const submittedDate = new Date(submittedAt);
+      const diffInSeconds = Math.floor((now - submittedDate) / 1000);
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      const diffInDays = Math.floor(diffInHours / 24);
+
+      if (diffInMinutes < 1) {
+        return "Just now";
+      } else if (diffInMinutes < 60) {
+        return `${diffInMinutes} minutes ago`;
+      } else if (diffInHours < 24) {
+        return `${diffInHours} hours ago`;
+      } else if (diffInDays === 1) {
+        return "One day ago";
+      } else {
+        return `${diffInDays} days ago`;
+      }
     };
 
     const formattedResult = result.map((item) => ({
@@ -460,7 +495,7 @@ function getAllLeaveUsers(req, res) {
       division: item.division,
       start_date: formatDateTime(item.start_date),
       end_date: formatDateTime(item.end_date),
-      submitted_at: formatDateTime(item.submitted_at),
+      submitted_at: formatTimeAgo(item.submitted_at),
     }));
 
     res.status(200).json({ data: formattedResult });
@@ -827,15 +862,17 @@ function getApprovedLeaveRequests(req, res) {
 
     const formattedResults = results.map((item) => ({
       ...item,
-      submitted_at: new Date(item.submitted_at).toLocaleString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      }).replace(/,([^\s])/, ', $1'),
-      leavestatus: item.leavestatus.replace(/Approved by .*/, 'Approved'),
+      submitted_at: new Date(item.submitted_at)
+        .toLocaleString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        })
+        .replace(/,([^\s])/, ", $1"),
+      leavestatus: item.leavestatus.replace(/Approved by .*/, "Approved"),
     }));
 
     res.status(200).json(formattedResults);

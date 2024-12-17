@@ -140,50 +140,93 @@ const handleAttendance = (req, res) => {
 const getAttendanceOverview = (req, res) => {
   const userId = req.user.id;
 
-  db.query(
-    `SELECT 
-        COUNT(*) AS total_attendance,
-        SUM(CASE WHEN check_out_time IS NULL THEN 1 ELSE 0 END) AS active_attendance,
-        SUM(CASE WHEN attendance_status_id = 1 THEN 1 ELSE 0 END) AS on_time,
-        SUM(CASE WHEN attendance_status_id = 2 THEN 1 ELSE 0 END) AS late,
-        SUM(CASE WHEN is_absence = 1 THEN 1 ELSE 0 END) AS total_absence,
-        SUM(CASE WHEN ac.attendance_category = 'Work From Office' THEN 1 ELSE 0 END) AS total_work_from_office,
-        SUM(CASE WHEN ac.attendance_category = 'Work From Home' THEN 1 ELSE 0 END) AS total_work_from_home,
-        MAX(a.check_in_time) AS check_in_time,
-        MAX(a.check_out_time) AS check_out_time
-      FROM attendance a
-      JOIN attendance_category ac ON a.attendance_category_id = ac.attendance_category_id
-      WHERE a.userId = ? AND a.attendance_date = CURDATE()`,
-    [userId],
-    (err, result) => {
+  const queryAccumulated = `
+    SELECT 
+      COUNT(*) AS total_attendance,
+      SUM(CASE WHEN attendance_status_id = 2 THEN 1 ELSE 0 END) AS late,
+      SUM(CASE WHEN is_absence = 1 THEN 1 ELSE 0 END) AS total_absence,
+      SUM(CASE WHEN ac.attendance_category = 'Work From Office' THEN 1 ELSE 0 END) AS total_work_from_office,
+      SUM(CASE WHEN ac.attendance_category = 'Work From Home' THEN 1 ELSE 0 END) AS total_work_from_home
+    FROM attendance a
+    JOIN attendance_category ac ON a.attendance_category_id = ac.attendance_category_id
+    WHERE a.userId = ?`;
+
+  const queryDaily = `
+    SELECT 
+      MAX(a.check_in_time) AS check_in_time,
+      MAX(a.check_out_time) AS check_out_time,
+      SUM(CASE WHEN check_out_time IS NULL THEN 1 ELSE 0 END) AS active_attendance,
+      SUM(CASE WHEN attendance_status_id = 1 THEN 1 ELSE 0 END) AS on_time
+    FROM attendance a
+    JOIN attendance_category ac ON a.attendance_category_id = ac.attendance_category_id
+    WHERE a.userId = ? AND a.attendance_date = CURDATE()`;
+
+  const queryPreviousDay = `
+    SELECT 
+      MAX(a.check_out_time) AS check_out_time
+    FROM attendance a
+    WHERE a.userId = ? AND a.attendance_date = CURDATE() - INTERVAL 1 DAY`;
+
+  db.query(queryAccumulated, [userId], (err, accumulatedResult) => {
+    if (err) {
+      console.error("Error fetching accumulated attendance:", err.message);
+      return res
+        .status(500)
+        .json({ message: "Failed to fetch attendance overview" });
+    }
+
+    db.query(queryDaily, [userId], (err, dailyResult) => {
       if (err) {
-        console.error("Error fetching attendance overview:", err.message);
+        console.error("Error fetching daily attendance:", err.message);
         return res
           .status(500)
           .json({ message: "Failed to fetch attendance overview" });
       }
 
-      const formatDateTime = (dateTime) => {
-        const date = new Date(dateTime);
-        const hh = String(date.getHours()).padStart(2, "0");
-        const mi = String(date.getMinutes()).padStart(2, "0");
-        return `${hh}:${mi}`;
-      };
+      db.query(queryPreviousDay, [userId], (err, previousDayResult) => {
+        if (err) {
+          console.error(
+            "Error fetching previous day's check-out time:",
+            err.message
+          );
+          return res
+            .status(500)
+            .json({ message: "Failed to fetch previous day's check-out time" });
+        }
 
-      const overview = result[0];
-      if (overview.check_in_time) {
-        overview.check_in_time = formatDateTime(overview.check_in_time);
-      }
-      if (overview.check_out_time) {
-        overview.check_out_time = formatDateTime(overview.check_out_time);
-      }
+        const formatDateTime = (dateTime) => {
+          const date = new Date(dateTime);
+          const hh = String(date.getHours()).padStart(2, "0");
+          const mi = String(date.getMinutes()).padStart(2, "0");
+          return `${hh}:${mi}`;
+        };
 
-      res.status(200).json({
-        message: "Attendance overview fetched successfully",
-        overview,
+        const overview = {
+          total_attendance: accumulatedResult[0].total_attendance || 0,
+          late: accumulatedResult[0].late || 0,
+          total_absence: accumulatedResult[0].total_absence || 0,
+          total_work_from_office:
+            accumulatedResult[0].total_work_from_office || 0,
+          total_work_from_home: accumulatedResult[0].total_work_from_home || 0,
+          active_attendance: dailyResult[0].active_attendance || 0,
+          on_time: dailyResult[0].on_time || 0,
+          check_in_time: dailyResult[0].check_in_time
+            ? formatDateTime(dailyResult[0].check_in_time)
+            : null,
+          check_out_time: dailyResult[0].check_out_time
+            ? formatDateTime(dailyResult[0].check_out_time)
+            : previousDayResult[0].check_out_time
+            ? formatDateTime(previousDayResult[0].check_out_time)
+            : null,
+        };
+
+        res.status(200).json({
+          message: "Attendance overview fetched successfully",
+          overview,
+        });
       });
-    }
-  );
+    });
+  });
 };
 
 module.exports = {

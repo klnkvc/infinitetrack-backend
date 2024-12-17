@@ -6,7 +6,8 @@ const getContacts = async (req, res) => {
       SELECT 
         u.userId, 
         u.name, 
-        u.phone_number, 
+        u.phone_number,
+        u.email, 
         p.positionId, 
         p.positionName 
       FROM 
@@ -34,15 +35,14 @@ const getContacts = async (req, res) => {
         name: contact.name,
         positionId: contact.positionId,
         positionName: contact.positionName,
-        phone_number: contact.phone_number,
         actions: {
           call: `tel:${contact.phone_number}`,
-          sms: `sms:${contact.phone_number}`,
+          email: `mailto:${contact.email}`,
           whatsapp: `https://wa.me/${contact.phone_number}`,
         },
       }));
 
-      res.status(200).json(formattedContacts);
+      res.status(200).json({ contactData: formattedContacts });
     });
   } catch (err) {
     console.error("Error fetching contacts:", err.message);

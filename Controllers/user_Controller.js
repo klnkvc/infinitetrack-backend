@@ -318,7 +318,9 @@ const updateUser = (req, res) => {
       }
 
       db.query(
-        `UPDATE users SET ${fields.map((f) => `${f} = ?`).join(", ")} WHERE userId = ?`,
+        `UPDATE users SET ${fields
+          .map((f) => `${f} = ?`)
+          .join(", ")} WHERE userId = ?`,
         [...values, userId],
         (err, result) => {
           if (err) {
@@ -478,7 +480,8 @@ const getAttendanceByUserId = (req, res) => {
         ? new Date(record.check_out_time)
         : null;
 
-      const formattedAttendanceDate = `${attendanceDate.getDate()} ${attendanceDate.toLocaleString(
+      const formattedAttendanceDate = attendanceDate.getDate().toString();
+      const formattedAttendanceMonthYear = `${attendanceDate.toLocaleString(
         "id-ID",
         { month: "long" }
       )} ${attendanceDate.getFullYear()}`;
@@ -489,6 +492,7 @@ const getAttendanceByUserId = (req, res) => {
         attendance_category: record.attendance_category,
         attendance_status: record.attendance_status,
         attendance_date: formattedAttendanceDate,
+        attendance_month_year: formattedAttendanceMonthYear,
         check_in_time: checkInTime
           ? checkInTime.toLocaleTimeString("id-ID", {
               hour: "2-digit",
