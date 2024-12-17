@@ -480,10 +480,14 @@ const getAttendanceByUserId = (req, res) => {
         ? new Date(record.check_out_time)
         : null;
 
-      const formattedAttendanceDate = attendanceDate.getDate().toString();
+      const formattedAttendanceDate = attendanceDate
+        .getDate()
+        .toString()
+        .padStart(2, "0");
+
       const formattedAttendanceMonthYear = `${attendanceDate.toLocaleString(
-        "id-ID",
-        { month: "long" }
+        "en-EN",
+        { month: "short" }
       )} ${attendanceDate.getFullYear()}`;
 
       return {
