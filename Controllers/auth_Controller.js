@@ -22,6 +22,8 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: "Invalid password" });
     }
 
+    const profilePhoto = user.profile_photo;
+
     const queryFindRole = "SELECT * FROM roles WHERE roleId = ?";
     db.query(queryFindRole, [user.roleId], (err, roleResult) => {
       if (err) {
@@ -57,12 +59,20 @@ const loginUser = async (req, res) => {
               userRole,
               positionName,
               res,
-              email
+              email,
+              profilePhoto
             );
           }
         );
       } else {
-        handleDivisionAndLeaveBalance(user, userRole, positionName, res, email);
+        handleDivisionAndLeaveBalance(
+          user,
+          userRole,
+          positionName,
+          res,
+          email,
+          profilePhoto
+        );
       }
     });
   });
@@ -73,7 +83,8 @@ function handleDivisionAndLeaveBalance(
   userRole,
   positionName,
   res,
-  email
+  email,
+  profilePhoto
 ) {
   if (user.divisionId) {
     const queryFindDivision = "SELECT * FROM divisions WHERE divisionId = ?";
@@ -165,7 +176,8 @@ function handleDivisionAndLeaveBalance(
                             positionName,
                             annualBalance,
                             annualUsed,
-                            headprogramname
+                            headprogramname,
+                            profilePhoto
                           );
                         }
                       );
@@ -177,7 +189,8 @@ function handleDivisionAndLeaveBalance(
                       userRole,
                       positionName,
                       division,
-                      res
+                      res,
+                      profilePhoto
                     );
                   }
                 }
@@ -189,7 +202,8 @@ function handleDivisionAndLeaveBalance(
                 userRole,
                 positionName,
                 division,
-                res
+                res,
+                profilePhoto
               );
             }
           }
@@ -201,7 +215,8 @@ function handleDivisionAndLeaveBalance(
           userRole,
           positionName,
           division,
-          res
+          res,
+          profilePhoto
         );
       }
     });
@@ -212,7 +227,8 @@ function handleDivisionAndLeaveBalance(
       userRole,
       positionName,
       null,
-      res
+      res,
+      profilePhoto
     );
   }
 }
@@ -223,7 +239,8 @@ function handleLeaveBalanceWithoutHeadProgram(
   userRole,
   positionName,
   division,
-  res
+  res,
+  profilePhoto
 ) {
   const queryFindLeaveBalance =
     "SELECT annual_balance, annual_used FROM leave_balance WHERE userId = ?";
@@ -249,7 +266,8 @@ function handleLeaveBalanceWithoutHeadProgram(
       positionName,
       annualBalance,
       annualUsed,
-      null
+      null,
+      profilePhoto
     );
   });
 }
@@ -263,7 +281,8 @@ function sendResponse(
   positionName,
   annualBalance,
   annualUsed,
-  headprogramname
+  headprogramname,
+  profilePhoto
 ) {
   const token = jwt.sign(
     { id: user.userId, role: user.roleId },
@@ -321,6 +340,7 @@ function sendResponse(
     start_contract: user.start_contract || null,
     end_contract: user.end_contract || null,
     isProfileComplete,
+    profilePhoto,
     message: isProfileComplete ? null : missingFieldsMessage,
   });
 }

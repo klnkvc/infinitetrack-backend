@@ -42,16 +42,16 @@ function getProgramAndHeadProgramIdByHeadProgramName(
   callback
 ) {
   const query = `
-    SELECT 
-      hp.headprogramId,
-      hp.programId
-    FROM 
-      users u
-    INNER JOIN 
-      head_program hp ON u.userId = hp.userId
-    WHERE 
-      u.name = ?;
-  `;
+   SELECT
+     hp.headprogramId,
+     hp.programId
+   FROM
+     users u
+   INNER JOIN
+     head_program hp ON u.userId = hp.userId
+   WHERE
+     u.name = ?;
+ `;
 
   db.query(query, [headProgramName], (err, result) => {
     if (err) {
@@ -133,11 +133,11 @@ function getLeavetypeIdByLeaveType(leavetype, callback) {
 
 function checkAnnualUsage(userId, callback) {
   const query = `
-    SELECT leavebalanceId, annual_used, annual_balance 
-    FROM leave_balance 
-    WHERE userId = ? 
-    LIMIT 1
-  `;
+   SELECT leavebalanceId, annual_used, annual_balance
+   FROM leave_balance
+   WHERE userId = ?
+   LIMIT 1
+ `;
 
   db.query(query, [userId], (err, result) => {
     if (err) {
@@ -397,9 +397,9 @@ function insertLeaveRequest(data, callback) {
   //   );
   // });
 
-  const query = `INSERT INTO leave_users 
-    (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const query = `INSERT INTO leave_users
+   (userId, headprogramId, divisionId, start_date, end_date, leavetypeId, description, phone, address, upload_image, leavestatusId)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
   db.query(
     query,
@@ -429,11 +429,11 @@ function insertLeaveRequest(data, callback) {
 
 function getAllLeaveUsers(req, res) {
   const query = `
-    SELECT u.name AS userName, u.profile_photo, d.division, lu.start_date, lu.end_date, lu.submitted_at
-    FROM leave_users lu
-    JOIN users u ON lu.userId = u.userId
-    JOIN divisions d ON u.divisionId = d.divisionId
-  `;
+   SELECT u.name AS userName, u.profile_photo, d.division, lu.start_date, lu.end_date, lu.submitted_at
+   FROM leave_users lu
+   JOIN users u ON lu.userId = u.userId
+   JOIN divisions d ON u.divisionId = d.divisionId
+ `;
 
   db.query(query, (err, result) => {
     if (err) {
@@ -445,27 +445,31 @@ function getAllLeaveUsers(req, res) {
 
     const formatDateTime = (dateTime) => {
       const date = new Date(dateTime);
-      const day = String(date.getDate()).padStart(2, "0");
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+      // const day = String(date.getDate()).padStart(2, "0");
 
-      const months = [
-        "Januari",
-        "Februari",
-        "Maret",
-        "April",
-        "Mei",
-        "Juni",
-        "Juli",
-        "Agustus",
-        "September",
-        "Oktober",
-        "November",
-        "Desember",
-      ];
+      // const months = [
+      //   "Januari",
+      //   "Februari",
+      //   "Maret",
+      //   "April",
+      //   "Mei",
+      //   "Juni",
+      //   "Juli",
+      //   "Agustus",
+      //   "September",
+      //   "Oktober",
+      //   "November",
+      //   "Desember",
+      // ];
 
-      const month = months[date.getMonth()];
-      const year = date.getFullYear();
+      // const month = months[date.getMonth()];
+      // const year = date.getFullYear();
 
-      return `${day} ${month} ${year}`;
+      // return `${day} ${month} ${year}`;
     };
 
     const formatTimeAgo = (submittedAt) => {
@@ -508,11 +512,11 @@ function approveByHeadProgram(req, res) {
 
   if (approvalStatus === "approved") {
     const query = `
-      UPDATE leave_users 
-      SET leavestatusId = 2,       -- status 'Approved by HeadProgram'
-          approverId = 2           -- ID dari HeadProgram yang menyetujui
-      WHERE leaveId = ? AND leavestatusId = 1
-    `;
+     UPDATE leave_users
+     SET leavestatusId = 2,       -- status 'Approved by HeadProgram'
+         approverId = 2           -- ID dari HeadProgram yang menyetujui
+     WHERE leaveId = ? AND leavestatusId = 1
+   `;
 
     db.query(query, [leaveId], (err, result) => {
       if (err) {
@@ -535,11 +539,11 @@ function approveByHeadProgram(req, res) {
     });
   } else if (approvalStatus === "declined") {
     const query = `
-      UPDATE leave_users 
-      SET leavestatusId = 5,       -- status 'Declined'
-          approverId = 1           -- ID tetap pada HeadProgram yang menolak
-      WHERE leaveId = ? AND leavestatusId = 1
-    `;
+     UPDATE leave_users
+     SET leavestatusId = 5,       -- status 'Declined'
+         approverId = 1           -- ID tetap pada HeadProgram yang menolak
+     WHERE leaveId = ? AND leavestatusId = 1
+   `;
 
     db.query(query, [leaveId], (err, result) => {
       if (err) {
@@ -573,11 +577,11 @@ function approveByOperational(req, res) {
 
   if (approvalStatus === "approved") {
     const query = `
-      UPDATE leave_users 
-      SET leavestatusId = 3,  -- status 'Approved by Operational'
-        approverId = 3           
-      WHERE leaveId = ? AND leavestatusId = 2
-    `;
+     UPDATE leave_users
+     SET leavestatusId = 3,  -- status 'Approved by Operational'
+       approverId = 3          
+     WHERE leaveId = ? AND leavestatusId = 2
+   `;
 
     db.query(query, [leaveId], (err, result) => {
       if (err) {
@@ -599,11 +603,11 @@ function approveByOperational(req, res) {
     });
   } else if (approvalStatus === "declined") {
     const query = `
-      UPDATE leave_users 
-      SET leavestatusId = 5,       -- status 'Declined'
-          approverId = 2           -- ID tetap pada HeadProgram yang menolak
-      WHERE leaveId = ? AND leavestatusId = 2
-    `;
+     UPDATE leave_users
+     SET leavestatusId = 5,       -- status 'Declined'
+         approverId = 2           -- ID tetap pada HeadProgram yang menolak
+     WHERE leaveId = ? AND leavestatusId = 2
+   `;
 
     db.query(query, [leaveId], (err, result) => {
       if (err) {
@@ -636,10 +640,10 @@ function approveByProgramDirector(req, res) {
 
   if (approvalStatus === "approved") {
     const query = `
-      UPDATE leave_users 
-      SET leavestatusId = 4  -- status 'Approved by Program Director'
-      WHERE leaveId = ? AND leavestatusId = 3
-    `;
+     UPDATE leave_users
+     SET leavestatusId = 4  -- status 'Approved by Program Director'
+     WHERE leaveId = ? AND leavestatusId = 3
+   `;
 
     db.query(query, [leaveId], (err, result) => {
       if (err) {
@@ -661,10 +665,10 @@ function approveByProgramDirector(req, res) {
     });
   } else if (approvalStatus === "declined") {
     const query = `
-      UPDATE leave_users 
-      SET leavestatusId = 5  -- status 'Declined'
-      WHERE leaveId = ? AND leavestatusId = 3
-    `;
+     UPDATE leave_users
+     SET leavestatusId = 5  -- status 'Declined'
+     WHERE leaveId = ? AND leavestatusId = 3
+   `;
 
     db.query(query, [leaveId], (err, result) => {
       if (err) {
@@ -710,21 +714,21 @@ function getAssignedLeaveRequests(req, res) {
   }
 
   const query = `
-    SELECT 
-      lu.leaveId,
-      u.name AS userName,                 -- Nama user yang mengajukan leave
-      lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
-      lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
-      lu.submitted_at,
-      ls.leavestatus,                     -- Status cuti dari tabel leave_status
-      lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
-    FROM leave_users lu
-    INNER JOIN users u ON lu.userId = u.userId
-    INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
-    INNER JOIN leave_balance lb ON lu.userId = lb.userId
-    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
-    WHERE lu.leavestatusId = ?
-  `;
+   SELECT
+     lu.leaveId,
+     u.name AS userName,                 -- Nama user yang mengajukan leave
+     lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance
+     lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance
+     lu.submitted_at,
+     ls.leavestatus,                     -- Status cuti dari tabel leave_status
+     lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
+   FROM leave_users lu
+   INNER JOIN users u ON lu.userId = u.userId
+   INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
+   INNER JOIN leave_balance lb ON lu.userId = lb.userId
+   INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
+   WHERE lu.leavestatusId = ?
+ `;
 
   db.query(query, [statusId], (err, results) => {
     if (err) {
@@ -767,21 +771,21 @@ function getDeclinedLeaveRequests(req, res) {
   const statusId = 5;
 
   const query = `
-    SELECT 
-      lu.leaveId,
-      u.name AS userName,                 -- Nama user yang mengajukan leave
-      lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
-      lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
-      lu.submitted_at,
-      ls.leavestatus,                     -- Status cuti dari tabel leave_status
-      lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
-    FROM leave_users lu
-    INNER JOIN users u ON lu.userId = u.userId
-    INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
-    INNER JOIN leave_balance lb ON lu.userId = lb.userId
-    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
-    WHERE lu.leavestatusId = ?
-  `;
+   SELECT
+     lu.leaveId,
+     u.name AS userName,                 -- Nama user yang mengajukan leave
+     lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance
+     lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance
+     lu.submitted_at,
+     ls.leavestatus,                     -- Status cuti dari tabel leave_status
+     lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
+   FROM leave_users lu
+   INNER JOIN users u ON lu.userId = u.userId
+   INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
+   INNER JOIN leave_balance lb ON lu.userId = lb.userId
+   INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
+   WHERE lu.leavestatusId = ?
+ `;
 
   db.query(query, [statusId], (err, results) => {
     if (err) {
@@ -832,21 +836,21 @@ function getApprovedLeaveRequests(req, res) {
   }
 
   const query = `
-    SELECT 
-      lu.leaveId,
-      u.name AS userName,                 -- Nama user yang mengajukan leave
-      lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance 
-      lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance 
-      lu.submitted_at,
-      ls.leavestatus,                     -- Status cuti dari tabel leave_status
-      lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
-    FROM leave_users lu
-    INNER JOIN users u ON lu.userId = u.userId
-    INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
-    INNER JOIN leave_balance lb ON lu.userId = lb.userId
-    INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
-    WHERE lu.leavestatusId = ?
-  `;
+   SELECT
+     lu.leaveId,
+     u.name AS userName,                 -- Nama user yang mengajukan leave
+     lb.annual_used,                     -- Jumlah cuti terpakai dari tabel leave_balance
+     lb.annual_balance,                  -- Jumlah total cuti dari tabel leave_balance
+     lu.submitted_at,
+     ls.leavestatus,                     -- Status cuti dari tabel leave_status
+     lt.leavetype AS leavetype               -- Nama leave type dari tabel leave_type
+   FROM leave_users lu
+   INNER JOIN users u ON lu.userId = u.userId
+   INNER JOIN leave_type lt ON lu.leavetypeId = lt.leavetypeId
+   INNER JOIN leave_balance lb ON lu.userId = lb.userId
+   INNER JOIN leave_status ls ON lu.leavestatusId = ls.leavestatusId
+   WHERE lu.leavestatusId = ?
+ `;
 
   db.query(query, [statusId], (err, results) => {
     if (err) {

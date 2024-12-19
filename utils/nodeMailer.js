@@ -46,7 +46,15 @@ async function sendOTP(email, otp) {
                         font-family: Arial, sans-serif;
                         padding: 18px 20px 18px;
                         color: #000000;
-                        background-color: #f9f9f9;
+                        background-color: #fff;
+                    }
+                    .content-wrapper {
+                        background-color: rgba(243, 236, 255, 0.6);
+                        border: 2px solid #A164FF;
+                        border-radius: 40px;
+                        padding: 20px;
+                        margin: 80px 60px;
+                        text-align: left;
                     }
                     .otp-container {
                         text-align: center;
@@ -56,56 +64,53 @@ async function sendOTP(email, otp) {
                     .otp {
                         font-size: 30px;
                         font-weight: bold;
-                        color: #FFFFFF;
+                        color:#4C228C;
                         border: 1px solid #ccc;
-                        padding: 10px;
-                        padding-right: 30px;
-                        padding-left: 30px;
                         border-radius: 5px;
-                        background-color: #8169AE;
+                        background-color: rgba(76, 34, 140, 0.35);
                         display: inline-block;
+                        letter-spacing: 10px;
                     }
                     .center-text {
                         text-align: center;
                     }
                     .large-text {
-                        text-align: center;
+                        text-align: left;
                         font-size: 24px; 
                         font-weight: bold; 
+                    }
+                    .important-text {
+                        color: red;
+                        font-weight: bold;
+                        margin-top: 10px;
                     }
                     .footer {
                         background-color: #f9f9f9;
                         padding: 15px 20px;
-                        color: #f9f9f9;
-                        text-align: right;
-                    }
-                    .footer img {
-                        vertical-align: middle;
-                        margin-right: 10px;
-                    }
-                    .padding-bottom {
-                        padding-bottom: 30px; 
+                        color: #000000;
+                        text-align: left;
                     }
                 </style>
             </head>
             <body>
                 <div class="email-container">
                     <div class="header">
-                        <img src="https://www.dropbox.com/scl/fi/b5p8cn0qif9868hctokp5/banner_otp_verification.png?rlkey=z4sgwd9oasds65l8o416um0vj&st=ks1fpemq&raw=1"
+                        <img src="https://www.dropbox.com/scl/fi/g6hsqn5paewmlse3l5g3c/banner_otp.png?rlkey=z21dcdsar31610jird1bunmqc&st=psgadi12&raw=1"
                             alt="Infinite Track Logo" style="display: block; margin: 0 auto; width: 100%; height: auto;">
                     </div>
                     <div class="container">
-                        <img src="https://www.dropbox.com/scl/fi/zjsazg52n3iohyiko4rp7/logo_revisi.png?rlkey=27tr5qxfry02lnkx5ti2tkyjt&st=vu95vgju&raw=1" 
-                            alt="Decorative Image" style="display: block; margin: 0 auto; width: 100%; max-width: 200px;">
-                        <p class="large-text">Hello, ${user.name}</p>
-                        <p class="center-text">Great to see you aboard! Let's quickly<br>verify your email to get you started.<br>Your verification code is:</p>
-                        <div class="otp-container">
-                            <span class="otp">${otp}</span>
+                        <div class="content-wrapper">
+                            <img src="https://www.dropbox.com/scl/fi/klf8miwhtmc9n92bhghng/logo_revisi.png?rlkey=x81ajna4q137pxssxo8mol0g0&st=pksq9oie&raw=1" 
+                                alt="Decorative Image" style="display: block; margin: 0 auto; width: 100%; max-width: 200px;">
+                            <p class="large-text">Hello, ${user.name}</p>
+                            <p>Great to see you aboard! Let's quickly verify your email to get you started. Your verification code is:</p>
+                            <div class="otp-container">
+                                <span class="otp">${otp}</span>
+                            </div>
+                            <p class="important-text">This code only available for 1 minute.</p>
+                            <p>Please use this OTP to reset your password. Never share your code with anyone.</p>
+                            <p>Cheers,<br>Infinite Track by Infinite Learning.</p>
                         </div>
-                        <p>Please use this OTP to reset your password. Never share your code with anyone.</p>
-                        <p class="padding-bottom">Cheers,<br>Infinite Track by Infinite Learning.</p>
-                    </div>
-                    <div class="footer">
                     </div>
                 </div>
             </body>
