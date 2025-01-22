@@ -19,7 +19,7 @@ const divisionRoutes = require("./routes/divisionRoutes.js");
 const contactRoutes = require("./routes/contactRoutes.js");
 
 const app = express();
-const port = 3000;
+const port = process.env.APP_PORT;
 
 app.use(cors());
 app.use(bodyParser.json());
